@@ -1,0 +1,82 @@
+/* Print Styles */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 1cm;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background-color: white;
+    }
+
+    /* Hide everything by default if not in print layout path, 
+     but since we are opening a new window with only PrintLayout, 
+     we mainly style the layout itself. */
+    .print-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Screen styles for the print window to look correct before printing */
+/* Screen styles for the print window to look correct before printing */
+.print-layout {
+    width: 100vw;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 1cm;
+    position: relative;
+    /* For footer positioning */
+}
+
+.print-content {
+    column-count: 2;
+    column-gap: 3rem;
+    /* Increased gap */
+    column-rule: 1px dotted #ccc;
+    /* Dotted line separator */
+    height: 95%;
+    /* Leave room for footer */
+}
+
+.print-footer {
+    position: absolute;
+    bottom: 0.5cm;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #666;
+    border-top: none;
+}
+
+.print-image {
+    width: 100%;
+    /* Fit column width */
+    max-height: 50vh;
+    /* Limit height so it doesn't take whole column if tall */
+    object-fit: contain;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+h2 {
+    break-after: avoid;
+}
+
+/* Ensure markdown content renders well in print */
+.markdown-content {
+    font-size: 11pt;
+    /* Readable print size */
+    text-align: justify;
+}
+
+.markdown-content p {
+    margin-top: 0.5em;
+    /* Tighter spacing */
+}
