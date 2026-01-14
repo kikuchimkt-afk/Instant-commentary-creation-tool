@@ -16,6 +16,7 @@ function App() {
   const [speechRate, setSpeechRate] = useState(0.75);
   const [customInstructions, setCustomInstructions] = useState(localStorage.getItem('ai_instructions') || "");
   const [activeTab, setActiveTab] = useState('input'); // 'input' or 'result'
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const PRESETS = [
     { label: "標準", value: "" },
@@ -62,7 +63,8 @@ function App() {
   const handleGenerate = async () => {
     if (images.length === 0) return;
     if (!apiKey) {
-      alert("APIキーを入力してください");
+      alert("APIキーを入力してください (右上の設定アイコンから設定できます)");
+      setIsSettingsOpen(true);
       return;
     }
 
@@ -97,7 +99,7 @@ function App() {
       <header>
         <h1>インスタント解説作成ツール 📝</h1>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="speed-controls" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '2px' }}>
+          <div className="speed-controls desktop-only" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '2px' }}>
             <span style={{ fontSize: '0.8rem', margin: '0 8px', color: 'white' }}>再生速度:</span>
             {[0.5, 0.75, 1.0].map(rate => (
               <button
@@ -121,6 +123,7 @@ function App() {
           <select
             value={model}
             onChange={handleModelChange}
+            className="desktop-only"
             style={{ padding: '0.5rem', borderRadius: '4px' }}
           >
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
@@ -130,25 +133,89 @@ function App() {
           </select>
           <input
             type="password"
-            placeholder="Google Gemini API Key"
-            className="api-key-input mobile-hidden"
+            placeholder="Gemini API Key"
+            className="api-key-input desktop-only"
             value={apiKey}
             onChange={handleApiKeyChange}
           />
-          <a
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mobile-hidden"
-            style={{ color: '#fff', textDecoration: 'underline', alignSelf: 'center', fontSize: '0.9rem' }}
+          <button
+            className="settings-toggle"
+            onClick={() => setIsSettingsOpen(true)}
+            style={{ padding: '8px', background: 'transparent' }}
           >
-            取得
-          </a>
+            ⚙️
+          </button>
         </div>
       </header>
+
+      {/* Settings Drawer for Mobile */}
+      {isSettingsOpen && (
+        <div className="settings-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <div className="settings-drawer" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <h3>設定</h3>
+              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}>✕</button>
+            </div>
+            <div className="drawer-content">
+              <div className="setting-item">
+                <label>Gemini API Key:</label>
+                <input
+                  type="password"
+                  placeholder="API Key を入力"
+                  value={apiKey}
+                  onChange={handleApiKeyChange}
+                  style={{ width: '100%', padding: '10px', marginTop: '5px' }}
+                />
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>
+                  キーを取得する
+                </a>
+              </div>
+
+              <div className="setting-item">
+                <label>使用モデル:</label>
+                <select value={model} onChange={handleModelChange} style={{ width: '100%', padding: '10px', marginTop: '5px' }}>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                </select>
+              </div>
+
+              <div className="setting-item">
+                <label>音声再生速度:</label>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+                  {[0.5, 0.75, 1.0].map(rate => (
+                    <button
+                      key={rate}
+                      onClick={() => setSpeechRate(rate)}
+                      style={{
+                        flex: 1,
+                        background: speechRate === rate ? 'var(--primary-color)' : '#f0f0f0',
+                        color: speechRate === rate ? 'white' : '#333'
+                      }}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '2rem' }}>
+                <button
+                  onClick={() => setIsSettingsOpen(false)}
+                  style={{ width: '100%', padding: '1rem', background: 'var(--primary-color)', color: 'white' }}
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className={activeTab}>
         <div className={`split-pane left-pane ${activeTab === 'input' ? 'mobile-visible' : 'mobile-hidden'}`}>
-          <section>
+          <section className="scroll-area">
             <h2>問題 (全 {images.length} ページ)</h2>
             <div className="images-list" style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '1rem', paddingBottom: '0.5rem' }}>
               {images.map((img, index) => (
@@ -165,42 +232,41 @@ function App() {
               ))}
             </div>
             <CameraInput onAddPage={handleAddPage} />
+
+            <section className="custom-instructions-area" style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
+              <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#555' }}>AIへの追加指示</h3>
+              <div className="preset-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                {PRESETS.map(preset => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleInstructionsChange(preset.value)}
+                    style={{ fontSize: '0.8rem', padding: '4px 8px', background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                placeholder="例：特に英文法の説明を詳しくして / 文中の英単語リストを作って ..."
+                value={customInstructions}
+                onChange={(e) => handleInstructionsChange(e.target.value)}
+                style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '0.9rem', boxSizing: 'border-box' }}
+              />
+            </section>
           </section>
 
-          <section className="custom-instructions-area" style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
-            <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#555' }}>AIへの追加指示</h3>
-            <div className="preset-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-              {PRESETS.map(preset => (
-                <button
-                  key={preset.label}
-                  onClick={() => handleInstructionsChange(preset.value)}
-                  style={{ fontSize: '0.8rem', padding: '4px 8px', background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <textarea
-              placeholder="例：特に英文法の説明を詳しくして / 文中の英単語リストを作って ..."
-              value={customInstructions}
-              onChange={(e) => handleInstructionsChange(e.target.value)}
-              style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '0.9rem', boxSizing: 'border-box' }}
-            />
-          </section>
-
-          <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', gap: '10px' }}>
+          <div className="action-bar">
             <button
               onClick={handleGenerate}
               disabled={images.length === 0 || loading}
-              style={{ flex: 1, padding: '1rem', fontSize: '1.2rem' }}
+              className="generate-btn"
             >
               {loading ? '作成中...' : '解説を作成する ✨'}
             </button>
             <button
               onClick={handlePrintPreview}
               disabled={images.length === 0 || !result}
-              className="mobile-hidden"
-              style={{ flex: 1, padding: '1rem', fontSize: '1.2rem', backgroundColor: '#28a745' }}
+              className="mobile-hidden print-btn"
             >
               印刷プレビュー 🖨️
             </button>
