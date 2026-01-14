@@ -4,7 +4,7 @@ const GENERATION_CONFIG = {
   temperature: 0.9,
   topK: 1,
   topP: 1,
-  maxOutputTokens: 2048,
+  maxOutputTokens: 8192,
 };
 
 export const generateExplanation = async (apiKey, imageBase64Data, modelName = "gemini-1.5-flash") => {
