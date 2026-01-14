@@ -1,338 +1,1359 @@
-import React, { useState } from 'react';
-import CameraInput from './components/CameraInput';
-import ResultDisplay from './components/ResultDisplay';
-import { generateExplanation } from './services/gemini';
-import PrintLayout from './components/PrintLayout';
-import './print.css';
-import './crop_modal.css';
-import './index.css';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import { MainLayout } from './components/layout/MainLayout';
+import { Tabs } from './components/ui/Tabs';
+import { AVAILABLE_YEARS, MOCK_DATA } from './data/mockData';
 
-function App() {
-  const [images, setImages] = useState([]);
-  const [result, setResult] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || "");
-  const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-1.5-flash");
-  const [speechRate, setSpeechRate] = useState(0.75);
-  const [customInstructions, setCustomInstructions] = useState(localStorage.getItem('ai_instructions') || "");
-  const [activeTab, setActiveTab] = useState('input'); // 'input' or 'result'
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isUiFocused, setIsUiFocused] = useState(false); // New: track camera/crop modal activity
+// Markdown Renderer
+const MarkdownRenderer = ({ text, translations = [], onSentenceClick, highlightedSentence }) => {
+  if (!text) return <div className="markdown-body">No content available</div>;
 
-  const PRESETS = [
-    { label: "標準", value: "" },
-    { label: "要点まとめ", value: "特に重要なポイントを3つに絞って解説してください。" },
-    { label: "中学生向け", value: "中学生にもわかるように、難しい専門用語を使わずに優しく解説してください。" },
-    { label: "文法の解説重視", value: "使われている重要な英文法事項について、例文を交えて詳しく解説してください。" },
-  ];
-
-  const handleInstructionsChange = (val) => {
-    setCustomInstructions(val);
-    localStorage.setItem('ai_instructions', val);
+  // Function to split text into sentences while keeping punctuation
+  const splitTextIntoSentences = (text) => {
+    if (typeof text !== 'string') return [text];
+    // Split by sentence-ending punctuation (and optional quote) followed by space or newline
+    return text.split(/(?<=[.!?]["”]?)\s+/);
   };
 
-  // Simple "Routing" based on URL query parameter
-  // Hooks must be called before this conditional return
-  const isPrintMode = new URLSearchParams(window.location.search).get('mode') === 'print';
-
-  if (isPrintMode) {
-    return <PrintLayout />;
-  }
-
-  const handleApiKeyChange = (e) => {
-    const key = e.target.value;
-    setApiKey(key);
-    localStorage.setItem('gemini_api_key', key);
-  };
-
-  const handleModelChange = (e) => {
-    const newModel = e.target.value;
-    setModel(newModel);
-    localStorage.setItem('gemini_model', newModel);
-  };
-
-  const handleAddPage = (imageData) => {
-    setImages(prev => [...prev, imageData]);
-    setResult(""); // Clear previous result
-  };
-
-  const handleDeletePage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setResult("");
-  };
-
-  const handleGenerate = async () => {
-    if (images.length === 0) return;
-    if (!apiKey) {
-      alert("APIキーを入力してください (右上の設定アイコンから設定できます)");
-      setIsSettingsOpen(true);
-      return;
-    }
-
-    setLoading(true);
-    setActiveTab('result'); // Switch to result tab on mobile
-    try {
-      // Extract base64 part
-      const base64Images = images.map(img => img.split(',')[1]);
-
-      const text = await generateExplanation(apiKey, base64Images, model, customInstructions);
-      setResult(text);
-    } catch (error) {
-      console.error(error);
-      alert(`解説の作成に失敗しました。\n詳細: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePrintPreview = () => {
-    // Save current state to localStorage for the print window to pick up
-    localStorage.setItem('print_images', JSON.stringify(images));
-    localStorage.setItem('print_result', result || "");
-
-    // Open new window with ?mode=print
-    const printUrl = `${window.location.origin}${window.location.pathname}?mode=print`;
-    window.open(printUrl, '_blank');
+  // Helper to extract text from children
+  const extractText = (children) => {
+    if (typeof children === 'string') return children;
+    if (Array.isArray(children)) return children.map(extractText).join('');
+    if (children?.props?.children) return extractText(children.props.children);
+    return '';
   };
 
   return (
-    <>
-      <header>
-        <h1>インスタント解説作成ツール 📝</h1>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="speed-controls desktop-only" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '2px' }}>
-            <span style={{ fontSize: '0.8rem', margin: '0 8px', color: 'white' }}>再生速度:</span>
-            {[0.5, 0.75, 1.0].map(rate => (
-              <button
-                key={rate}
-                onClick={() => setSpeechRate(rate)}
-                className={speechRate === rate ? 'speed-btn active' : 'speed-btn'}
+    <div className="markdown-body">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          h2: (props) => <h2 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginTop: '1.5rem' }} {...props} />,
+          h3: (props) => <h3 style={{ color: 'var(--accent-primary)', marginTop: '1.5rem' }} {...props} />,
+          blockquote: (props) => {
+            const content = extractText(props.children);
+            return (
+              <blockquote
                 style={{
-                  padding: '4px 8px',
-                  fontSize: '0.8rem',
-                  minHeight: 'auto',
-                  background: speechRate === rate ? 'white' : 'transparent',
-                  color: speechRate === rate ? 'var(--primary-color)' : 'white',
-                  border: 'none',
-                  borderRadius: '6px'
+                  borderLeft: '4px solid var(--accent-primary)',
+                  paddingLeft: '1rem',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--bg-secondary)',
+                  padding: '0.5rem 1rem'
                 }}
-              >
-                {rate}x
-              </button>
-            ))}
-          </div>
-          <select
-            value={model}
-            onChange={handleModelChange}
-            className="desktop-only"
-            style={{ padding: '0.5rem', borderRadius: '4px' }}
-          >
-            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
-            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-          </select>
-          <input
-            type="password"
-            placeholder="Gemini API Key"
-            className="api-key-input desktop-only"
-            value={apiKey}
-            onChange={handleApiKeyChange}
-          />
-        </div>
-      </header>
-
-      {/* Floating Settings Button - Hide when UI is focused on camera/crop */}
-      {!isUiFocused && (
-        <button
-          className="mobile-fab-settings"
-          onClick={() => setIsSettingsOpen(true)}
-          aria-label="Settings"
-        >
-          ⚙️
-        </button>
-      )}
-
-      {/* Settings Drawer for Mobile */}
-      {isSettingsOpen && (
-        <div className="settings-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="settings-drawer" onClick={e => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h3>設定</h3>
-              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}>✕</button>
-            </div>
-            <div className="drawer-content">
-              <div className="setting-item">
-                <label>Gemini API Key:</label>
-                <input
-                  type="password"
-                  placeholder="API Key を入力"
-                  value={apiKey}
-                  onChange={handleApiKeyChange}
-                  style={{ width: '100%', padding: '12px', marginTop: '5px', boxSizing: 'border-box' }}
-                />
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.9rem', color: 'var(--primary-color)', marginTop: '10px', display: 'inline-block' }}>
-                  キーを取得する (Google AI Studio) ↗
-                </a>
-              </div>
-
-              <div className="setting-item">
-                <label>使用モデル:</label>
-                <select value={model} onChange={handleModelChange} style={{ width: '100%', padding: '12px', marginTop: '5px' }}>
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                  <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
-                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                </select>
-              </div>
-
-              <div className="setting-item">
-                <label>音声再生速度:</label>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                  {[0.5, 0.75, 1.0].map(rate => (
-                    <button
-                      key={rate}
-                      onClick={() => setSpeechRate(rate)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: speechRate === rate ? 'var(--primary-color)' : '#f0f0f0',
-                        color: speechRate === rate ? 'white' : '#333'
-                      }}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ marginTop: '2rem' }}>
-                <button
-                  onClick={() => setIsSettingsOpen(false)}
-                  style={{ width: '100%', padding: '1rem', background: 'var(--primary-color)', color: 'white' }}
-                >
-                  設定を閉じる
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <main className={activeTab}>
-        <div className={`split-pane left-pane ${activeTab === 'input' ? 'mobile-visible' : 'mobile-hidden'}`}>
-          <section className="scroll-area">
-            {images.length > 0 ? (
-              <>
-                <h2>問題 (全 {images.length} ページ)</h2>
-                <div className="images-list" style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '1rem', paddingBottom: '0.5rem' }}>
-                  {images.map((img, index) => (
-                    <div key={index} style={{ position: 'relative', minWidth: '100px', maxWidth: '150px' }}>
-                      <img src={img} alt={`Page ${index + 1}`} style={{ width: '100%', borderRadius: '4px', border: '1px solid #ddd' }} />
-                      <button
-                        onClick={() => handleDeletePage(index)}
-                        style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: 'white', borderRadius: '50%', width: '24px', height: '24px', padding: 0, fontSize: '12px', minHeight: 'auto', border: '2px solid white', cursor: 'pointer' }}
-                      >
-                        ✕
-                      </button>
-                      <span style={{ fontSize: '0.8rem', display: 'block', textAlign: 'center' }}>P.{index + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="setup-guide" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
-                {!apiKey ? (
-                  <div className="guide-card" style={{ marginBottom: '2rem', background: '#fff9e6', border: '1px solid #ffe58f', padding: '1.5rem', borderRadius: '12px' }}>
-                    <h3 style={{ marginTop: 0 }}>Step 1: APIキーの設定 🔑</h3>
-                    <p style={{ fontSize: '0.9rem', color: '#856404' }}>まずは解説を作成するためのGemini APIキーを設定してください。</p>
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      style={{ background: '#ffc107', color: '#000', border: 'none' }}
-                    >
-                      設定を開く
-                    </button>
-                  </div>
-                ) : null}
-                <div className="guide-card" style={{ background: '#f0f7ff', border: '1px solid #bae7ff', padding: '1.5rem', borderRadius: '12px' }}>
-                  <h3 style={{ marginTop: 0 }}>Step 2: 写真を撮る 📸</h3>
-                  <p style={{ fontSize: '0.9rem', color: '#0050b3' }}>「カメラを起動」を押して、問題を撮影しましょう。</p>
-                </div>
-              </div>
-            )}
-
-            <CameraInput
-              onAddPage={handleAddPage}
-              onFocusChange={setIsUiFocused} // Pass state update to hid nav
-            />
-
-            <section className="custom-instructions-area" style={{ marginTop: '1.5rem', marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
-              <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#555' }}>AIへの追加指示</h3>
-              <div className="preset-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                {PRESETS.map(preset => (
-                  <button
-                    key={preset.label}
-                    onClick={() => handleInstructionsChange(preset.value)}
-                    style={{ fontSize: '0.8rem', padding: '6px 10px', background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                placeholder="例：特に英文法の説明を詳しくして / 文中の英単語リストを作って ..."
-                value={customInstructions}
-                onChange={(e) => handleInstructionsChange(e.target.value)}
-                style={{ width: '100%', minHeight: '80px', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSentenceClick && onSentenceClick(content, 'blockquote');
+                }}
+                {...props}
               />
-            </section>
-          </section>
+            );
+          },
+          p: ({ node, children, ...props }) => {
+            // Process children to find sentences and attach translations
+            const processedChildren = React.Children.map(children, child => {
+              if (typeof child === 'string') {
+                const sentences = splitTextIntoSentences(child);
+                return sentences.map((sentence, idx) => {
+                  const cleanSentence = sentence.trim();
+                  const translation = translations.find(t => {
+                    return t.en.trim() === cleanSentence;
+                  })?.ja;
 
-          <div className="action-bar">
-            {/* If focused, action bar is hidden to let camera/trim take full space */}
-            {!isUiFocused && (
-              <>
-                <button
-                  onClick={handleGenerate}
-                  disabled={images.length === 0 || loading}
-                  className="generate-btn"
-                >
-                  {loading ? '作成中...' : '解説を作成する ✨'}
-                </button>
-                <button
-                  onClick={handlePrintPreview}
-                  disabled={images.length === 0 || !result}
-                  className="mobile-hidden print-btn"
-                >
-                  印刷 🖨️
-                </button>
-              </>
-            )}
+                  const isHighlighted = highlightedSentence && cleanSentence.includes(highlightedSentence);
+
+                  if (translation) {
+                    return (
+                      <span
+                        key={idx}
+                        className={`sentence-item ${isHighlighted ? 'highlighted-sentence' : ''}`}
+                        style={isHighlighted ? { backgroundColor: '#fff9c4', boxShadow: '0 0 0 2px #fbc02d', borderRadius: '2px', transition: 'all 0.3s', cursor: 'pointer' } : { cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSentenceClick) {
+                            onSentenceClick(e, translation, cleanSentence);
+                          }
+                        }}
+                      >
+                        {sentence}{' '}
+                      </span>
+                    );
+                  }
+                  return <span key={idx} className={isHighlighted ? 'highlighted-sentence' : ''} style={isHighlighted ? { backgroundColor: '#fff9c4' } : {}}>{sentence}{' '}</span>;
+                });
+              }
+              return child;
+            });
+
+            return <p style={{ marginBottom: '1rem', lineHeight: '1.8' }} {...props}>{processedChildren}</p>;
+          },
+          li: (props) => <li style={{ marginBottom: '0.5rem' }} {...props} />,
+          strong: (props) => <strong className="highlight-text" {...props} />,
+          table: (props) => <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}><table className="data-table" {...props} /></div>,
+          th: (props) => <th {...props} />,
+          td: (props) => <td {...props} />,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div >
+  );
+};
+
+// Export Button Component
+const ExportButton = ({ label, onClick, icon = "📋" }) => (
+  <button
+    onClick={onClick}
+    style={{
+      padding: '0.5rem 1rem',
+      fontSize: '0.85rem',
+      backgroundColor: 'var(--accent-primary)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      transition: 'background-color 0.2s'
+    }}
+    onMouseOver={(e) => e.target.style.backgroundColor = 'var(--accent-hover)'}
+    onMouseOut={(e) => e.target.style.backgroundColor = 'var(--accent-primary)'}
+  >
+    {icon} {label}
+  </button>
+);
+
+// Utility: Split text into sentences
+const splitIntoSentences = (text) => {
+  // Remove markdown headers and clean text
+  const cleanText = text
+    .replace(/^##.*$/gm, '')
+    .replace(/^\s*\n/gm, '\n')
+    .trim();
+
+  // Split by sentence-ending punctuation followed by space or newline
+  const sentences = cleanText.split(/(?<=[.!?]["”]?)\s+(?=[A-Z])/);
+  return sentences.filter(s => s.trim().length > 10);
+};
+
+// Utility: Identify complex sentences (nested structures)
+const identifyComplexSentences = (sentences) => {
+  const complexIndicators = [
+    { pattern: /,\s*which\s/i, type: '関係代名詞 (which)' },
+    { pattern: /,\s*who\s/i, type: '関係代名詞 (who)' },
+    { pattern: /,\s*where\s/i, type: '関係副詞 (where)' },
+    { pattern: /—[^—]+—/i, type: 'ダッシュによる挿入' },
+    { pattern: /\([^)]+\)/i, type: '括弧による挿入' },
+    { pattern: /\s(although|though|while|whereas)\s/i, type: '譲歩節' },
+    { pattern: /\s(because|since|as)\s.*,/i, type: '理由節' },
+    { pattern: /\s(if|unless|provided)\s/i, type: '条件節' },
+    { pattern: /not only\s.*but\s(also)?/i, type: '相関接続詞' },
+    { pattern: /\s(what|whatever|whoever|however)\s/i, type: '複合関係詞' },
+    { pattern: /,\s*\w+ing\s/i, type: '分詞構文' },
+    { pattern: /:\s[a-z]/i, type: 'コロンによる説明' },
+  ];
+
+  const complexSentences = [];
+  sentences.forEach((sentence, index) => {
+    const found = [];
+    complexIndicators.forEach(({ pattern, type }) => {
+      if (pattern.test(sentence)) {
+        found.push(type);
+      }
+    });
+    // Count commas as complexity indicator
+    const commaCount = (sentence.match(/,/g) || []).length;
+    if (found.length > 0 || commaCount >= 3) {
+      complexSentences.push({
+        index: index + 1,
+        sentence: sentence.substring(0, 60) + (sentence.length > 60 ? '...' : ''),
+        types: found.length > 0 ? found : ['複数の節を含む複雑な構造'],
+        commaCount
+      });
+    }
+  });
+  return complexSentences;
+};
+
+// Generate syntax analysis template
+const generateSyntaxTemplate = (content, title) => {
+  const sentences = splitIntoSentences(content);
+  const complexSentences = identifyComplexSentences(sentences);
+
+  let output = `# 構文解説用テンプレート: ${title}\n\n`;
+
+  // Complex sentence warnings at the top
+  if (complexSentences.length > 0) {
+    output += `## ⚠️ 注意すべき複雑な構造を含むセンテンス\n\n`;
+    output += `> **以下のセンテンスは入れ子構造や挿入句を含むため、特に注意して解説してください。**\n\n`;
+    complexSentences.forEach(cs => {
+      output += `- **Sentence ${cs.index}:** ${cs.types.join(', ')}\n`;
+      output += `  - 「${cs.sentence}」\n`;
+    });
+    output += `\n---\n\n`;
+  }
+
+  output += `## 全センテンス構造解析\n\n`;
+  output += `**総センテンス数:** ${sentences.length}\n\n`;
+
+  sentences.forEach((sentence, index) => {
+    output += `### Sentence ${index + 1}\n\n`;
+    output += `> ${markMainVerbs(sentence)}\n\n`;
+    output += `**構造分解:**\n`;
+    output += `1. **主語 (Subject):** [記入]\n`;
+    output += `2. **主動詞 (Main Verb):** [記入]\n`;
+    output += `3. **目的語/補語 (Object/Complement):** [記入]\n`;
+    output += `4. **修飾要素 (Modifiers):** [記入]\n\n`;
+    output += `**ポイント:** [記入]\n\n`;
+    output += `---\n\n`;
+  });
+
+  return output;
+};
+
+// Mark main verbs in text (bold format for markdown)
+function markMainVerbs(content) {
+  // 1. Auxiliary Verb Phrases (Heuristic: Aux + (Adv) + Non-Determiner/Prep)
+  // Matches "has eaten", "is running", "can go", "was strictly forbidden"
+  // Excludes "has a", "is in", "can the"
+  const phrasePattern = /\b(can|could|will|would|shall|should|may|might|must|has|have|had|is|are|was|were|does|do|did)\s+(?:not\s+)?(?:never\s+)?(?:always\s+)?(?:[a-z]+ly\s+)?(?!a\b|an\b|the\b|my\b|your\b|his\b|her\b|its\b|our\b|their\b|this\b|that\b|these\b|those\b|some\b|any\b|no\b|to\b|in\b|on\b|at\b|by\b|for\b|of\b|with\b|from\b)\w+\b/gi;
+
+  // 2. Finite Strong Verbs (Single words) - Fallback for simple tenses
+  const verbPatterns = [
+    phrasePattern,
+    // Be verbs and modals (as single verbs)
+    /\b(is|are|was|were)\b/gi,
+    /\b(has|have|had)\b/gi,
+    /\b(does|do|did)\b/gi,
+    /\b(can|could|will|would|shall|should|may|might|must)\b/gi,
+
+    // Strong verbs (Finite forms only, mostly)
+    /\b(became|become|becomes)\b/gi,
+    /\b(made|make|makes)\b/gi,
+    /\b(led|lead|leads)\b/gi,
+    /\b(began|begin|begins)\b/gi,
+    /\b(rose|rise|rises)\b/gi,
+    /\b(fell|fall|falls)\b/gi,
+    /\b(took|take|takes)\b/gi,
+    /\b(gave|give|gives)\b/gi,
+    /\b(found|find|finds)\b/gi,
+    /\b(brought|bring|brings)\b/gi,
+    /\b(thought|think|thinks)\b/gi,
+    /\b(said|say|says)\b/gi,
+    /\b(went|go|goes)\b/gi,
+    /\b(came|come|comes)\b/gi,
+    /\b(saw|see|sees)\b/gi,
+    /\b(knew|know|knows)\b/gi,
+    /\b(got|get|gets)\b/gi,
+    /\b(set|sets)\b/gi,
+    /\b(put|puts)\b/gi,
+    /\b(kept|keep|keeps)\b/gi,
+    /\b(left|leave|leaves)\b/gi,
+    /\b(felt|feel|feels)\b/gi,
+    /\b(seemed|seem|seems)\b/gi,
+    /\b(appeared|appear|appears)\b/gi,
+    /\b(remained|remain|remains)\b/gi,
+    /\b(continued|continue|continues)\b/gi,
+    /\b(established|establish|establishes)\b/gi,
+    /\b(created|create|creates)\b/gi,
+    /\b(developed|develop|develops)\b/gi,
+    /\b(discovered|discover|discovers)\b/gi,
+    /\b(believed|believe|believes)\b/gi,
+    /\b(considered|consider|considers)\b/gi,
+    /\b(resulted|result|results)\b/gi,
+    /\b(caused|cause|causes)\b/gi,
+    /\b(allowed|allow|allows)\b/gi,
+    /\b(required|require|requires)\b/gi,
+    /\b(included|include|includes)\b/gi,
+    /\b(provided|provide|provides)\b/gi,
+    /\b(suggested|suggest|suggests)\b/gi,
+    /\b(argued|argue|argues)\b/gi,
+    /\b(claimed|claim|claims)\b/gi,
+    /\b(proved|prove|proves)\b/gi,
+    /\b(showed|show|shows)\b/gi,
+    /\b(meant|mean|means)\b/gi,
+    /\b(spread|spreads)\b/gi,
+    /\b(built|build|builds)\b/gi,
+    /\b(used|use|uses)\b/gi,
+    /\b(helped|help|helps)\b/gi,
+    /\b(changed|change|changes)\b/gi,
+    /\b(controlled|control|controls)\b/gi,
+    /\b(covered|cover|covers)\b/gi,
+    /\b(employed|employ|employs)\b/gi,
+    /\b(granted|grant|grants)\b/gi,
+    /\b(hoped|hope|hopes)\b/gi,
+    /\b(endured|endure|endures)\b/gi,
+    /\b(adopted|adopt|adopts)\b/gi,
+  ];
+
+  let markedContent = content;
+
+  const paragraphs = markedContent.split('\n\n');
+  const processedParagraphs = paragraphs.map(para => {
+    // Skip markdown headers and other special formatting
+    if (para.startsWith('#') || para.startsWith('*') || para.startsWith('-') || para.startsWith('>')) {
+      return para;
+    }
+
+    // Split into sentences to handle structural logic better
+    const sentences = para.split(/(?<=[.!?]["”]?)\s+(?=[A-Z])/);
+
+    return sentences.map(sentence => {
+      // 1. Mask excluded zones to prevent marking
+      let workingSentence = sentence;
+
+      // Mask quoted text
+      workingSentence = workingSentence.replace(/"[^"]*"/g, match => ' '.repeat(match.length));
+      workingSentence = workingSentence.replace(/“[^”]*”/g, match => ' '.repeat(match.length));
+      // Mask included text in parentheses
+      workingSentence = workingSentence.replace(/\([^)]*\)/g, match => ' '.repeat(match.length));
+
+      // Mask relative clauses / subordinate clauses (Heuristic)
+      const subordinators = ['who', 'which', 'that', 'where', 'when', 'if', 'although', 'because', 'since', 'while', 'as'];
+      subordinators.forEach(sub => {
+        // Regex to match subordinator and following text until comma or a limit
+        const regex = new RegExp(`\\b${sub}\\b[^,;]*`, 'gi');
+        workingSentence = workingSentence.replace(regex, match => ' '.repeat(match.length));
+      });
+
+      // Mask "to" + word (Infinitive)
+      workingSentence = workingSentence.replace(/\bto\s+\w+/gi, match => ' '.repeat(match.length));
+
+      // 2. Find finite verbs (or phrases) in the remaining "Safe" text
+      let matches = [];
+      verbPatterns.forEach(pattern => {
+        let match;
+        // Reset lastIndex for global regex
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(workingSentence)) !== null) {
+          matches.push({
+            word: match[0],
+            index: match.index
+          });
+        }
+      });
+
+      if (matches.length === 0) return sentence;
+
+      // Sort by index ASC, then by Length DESC (prioritize longer phrases starting at same pos)
+      matches.sort((a, b) => {
+        if (a.index !== b.index) return a.index - b.index;
+        return b.word.length - a.word.length;
+      });
+
+      // Strategy: Pick the first one (most likely Main Verb in main clause), 
+      // AND any subsequent ones preceded by 'and', 'or', 'but'
+      const finalVerbs = [];
+
+      if (matches.length > 0) {
+        finalVerbs.push(matches[0]);
+        // Track end position to avoid overlaps
+        let lastEnd = matches[0].index + matches[0].word.length;
+
+        // Look for coordinated verbs
+        for (let i = 1; i < matches.length; i++) {
+          const curr = matches[i];
+          // Skip if overlapping with selected match
+          if (curr.index < lastEnd) continue;
+
+          // Check text between last match and current
+          const textBetween = sentence.substring(lastEnd, curr.index);
+
+          if (/\b(and|or|but)\b/.test(textBetween) && textBetween.length < 20) {
+            finalVerbs.push(curr);
+            lastEnd = curr.index + curr.word.length;
+          }
+        }
+      }
+
+      // 3. Mark the selected verbs in the ORIGINAL sentence
+      // Create boolean mask
+      const isVerb = new Array(sentence.length).fill(false);
+      finalVerbs.forEach(v => {
+        for (let i = 0; i < v.word.length; i++) {
+          isVerb[v.index + i] = true;
+        }
+      });
+
+      let rebuilt = '';
+      let i = 0;
+      while (i < sentence.length) {
+        if (isVerb[i]) {
+          rebuilt += '**';
+          let j = i;
+          while (j < sentence.length && isVerb[j]) j++;
+          rebuilt += sentence.substring(i, j);
+          rebuilt += '**';
+          i = j;
+        } else {
+          rebuilt += sentence[i];
+          i++;
+        }
+      }
+      return rebuilt;
+
+    }).join(' '); // Rejoin sentences
+  });
+
+  return processedParagraphs.join('\n\n');
+}
+
+// Copy to clipboard utility
+const copyToClipboard = async (text, successMessage = 'コピーしました！') => {
+  try {
+    await navigator.clipboard.writeText(text);
+    alert(successMessage);
+  } catch (err) {
+    console.error('Copy failed:', err);
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert(successMessage);
+  }
+};
+
+// Utility: Strip common indentation from template literals
+const stripCommonIndent = (str) => {
+  if (!str) return '';
+  const lines = str.split('\n');
+  const validLines = lines.filter(line => line.trim().length > 0);
+  if (validLines.length === 0) return str;
+
+  // Find minimum indentation ignoring the first line if it starts with characters (often headers)
+  // Actually, standard template literal usage:
+  // `
+  //   content
+  //   content
+  // `
+  // The first line is empty.
+  // If the string starts with text immediately `text`, then indent is 0 for that line.
+
+  const minIndent = validLines.reduce((min, line) => {
+    const indent = line.match(/^\s*/)[0].length;
+    return Math.min(min, indent);
+  }, Infinity);
+
+  if (minIndent === 0) return str;
+
+  return lines.map(line => {
+    // Only strip if the line has enough length (don't strip empty lines to negative)
+    // Actually just slice if it matches the indent pattern or is empty
+    return line.length >= minIndent ? line.slice(minIndent) : line;
+  }).join('\n');
+};
+
+function App() {
+  // --- Persistent State Initialization ---
+  const [selectedYearSession, setSelectedYearSession] = useState(() => {
+    return localStorage.getItem('passageCraft_selectedYear') || "2025-2";
+  });
+
+  const [activeLeftTab, setActiveLeftTab] = useState(() => {
+    return localStorage.getItem('passageCraft_activeLeftTab') || 'past';
+  });
+
+  const [activeRightTab, setActiveRightTab] = useState(() => {
+    return localStorage.getItem('passageCraft_activeRightTab') || 'intent';
+  });
+
+  // --- Persistence Effects ---
+  useEffect(() => {
+    localStorage.setItem('passageCraft_selectedYear', selectedYearSession);
+  }, [selectedYearSession]);
+
+  useEffect(() => {
+    localStorage.setItem('passageCraft_activeLeftTab', activeLeftTab);
+  }, [activeLeftTab]);
+
+  useEffect(() => {
+    localStorage.setItem('passageCraft_activeRightTab', activeRightTab);
+  }, [activeRightTab]);
+
+  // Tooltip State
+  const [tooltip, setTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
+
+  // Highlight State for Syntax Interaction
+  const [highlightedSentence, setHighlightedSentence] = useState(null);
+
+  const handleSentenceClickInteraction = (e, translation, sentenceText) => {
+    // If clicking same sentence, toggle off (optional, or just keep it)
+    // User asked "click next sentence ... to clear", implies selection model.
+
+    // We update highlightedSentence to this sentence
+    setHighlightedSentence(sentenceText);
+
+    const rect = e.target.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top - 10;
+    setTooltip({ visible: true, text: translation, x, y });
+  };
+
+  const handleBackgroundClick = () => {
+    setHighlightedSentence(null);
+    setTooltip({ ...tooltip, visible: false });
+  };
+
+  // Handle click on syntax header or blockquote to highlight sentence in original text
+  const handleSyntaxClick = (content, type) => {
+    let targetSentence = null;
+    let targetTranslation = null;
+    let foundIndex = -1;
+
+    const sentences = currentData.original?.translations;
+    if (!sentences) return;
+
+    if (type === 'blockquote') {
+      // Content is the English sentence text
+      // We try to find it in the translations array
+      // Normalize whitespace for better matching
+      const cleanContent = content.trim();
+
+      // 1. Try exact/include match first
+      foundIndex = sentences.findIndex(t => t.en.trim().includes(cleanContent) || cleanContent.includes(t.en.trim()));
+
+      // 2. If not found, try robust matching for abbreviated text ("..." or "…")
+      if (foundIndex === -1 && (cleanContent.includes('...') || cleanContent.includes('…'))) {
+        // Split by ellipsis to find recognizable phrases
+        const chunks = cleanContent.split(/\.{3}|…/).map(c => c.trim()).filter(c => c.length > 10);
+
+        // Try to find a sentence that contains ANY of the significant chunks
+        for (const chunk of chunks) {
+          foundIndex = sentences.findIndex(t => t.en.includes(chunk));
+          if (foundIndex !== -1) break;
+        }
+      }
+
+      if (foundIndex !== -1) {
+        targetSentence = sentences[foundIndex].en;
+        targetTranslation = sentences[foundIndex].ja;
+      }
+    } else if (type === 'header') {
+      // Original logic: "Sentence X"
+      const sentenceMatch = content.match(/Sentence\s+(\d+)/);
+      if (sentenceMatch) {
+        const index = parseInt(sentenceMatch[1], 10) - 1;
+        if (sentences[index]) {
+          targetSentence = sentences[index].en;
+          targetTranslation = sentences[index].ja;
+        }
+      }
+    }
+
+    if (targetSentence) {
+      setHighlightedSentence(targetSentence);
+      setActiveLeftTab('original');
+
+      // Trigger translation popup and scroll
+      setTimeout(() => {
+        const spans = document.querySelectorAll('.sentence-item');
+        let targetSpan = null;
+
+        // Improved span finding logic
+        for (let span of spans) {
+          // Check if span text is part of target sentence OR target sentence is part of span text
+          // The span text might have extra spaces
+          const spanText = span.textContent.trim();
+          const cleanTarget = targetSentence.trim();
+
+          if (cleanTarget.includes(spanText) && spanText.length > 10) {
+            // span is a fragment of the sentence
+            targetSpan = span;
+            break;
+          }
+          if (spanText.includes(cleanTarget.substring(0, 20))) {
+            targetSpan = span;
+            break;
+          }
+        }
+
+        if (targetSpan) {
+          targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const rect = targetSpan.getBoundingClientRect();
+          setTooltip({
+            visible: true,
+            text: targetTranslation,
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10
+          });
+        }
+      }, 100);
+    }
+  };
+
+  // Adjust tooltip position if it goes off-screen
+  const tooltipRef = useRef(null);
+  useEffect(() => {
+    if (tooltip.visible && tooltipRef.current) {
+      const el = tooltipRef.current;
+      const rect = el.getBoundingClientRect();
+      const padding = 10;
+      let newX = tooltip.x;
+
+      // Check left edge
+      if (newX - rect.width / 2 < padding) {
+        newX = rect.width / 2 + padding;
+      }
+      // Check right edge
+      if (newX + rect.width / 2 > window.innerWidth - padding) {
+        newX = window.innerWidth - rect.width / 2 - padding;
+      }
+
+      if (newX !== tooltip.x) {
+        setTooltip(prev => ({ ...prev, x: newX }));
+      }
+    }
+  }, [tooltip.visible, tooltip.text]);
+
+  // Left Column Tabs
+  const leftTabs = [
+    { id: 'past', label: '過去問本文' },
+    { id: 'past_q', label: '過去問設問' },
+    { id: 'original', label: 'オリジナル本文' },
+    { id: 'original_q', label: 'オリジナル設問' },
+  ];
+
+  // Right Column Tabs
+  const rightTabs = [
+    { id: 'intent', label: '作成意図・根拠' },
+    { id: 'summary', label: '本文要約' },
+    { id: 'comparison', label: '過去問との比較' },
+    { id: 'syntax', label: '構文解説' },
+  ];
+
+  // Derive content based on selection
+  const currentData = MOCK_DATA[selectedYearSession] || {
+    past: { title: "Data Not Found", content: "Data not available for this selection." },
+    original: {},
+    analysis: {}
+  };
+
+  // Helper to get content for Left Panel
+  const getLeftContent = () => {
+    let content = '';
+    switch (activeLeftTab) {
+      case 'past': content = currentData.past?.content; break;
+      case 'past_q': content = currentData.past?.questions; break;
+      case 'original': content = currentData.original?.content; break;
+      case 'original_q': content = currentData.original?.questions; break;
+      default: content = '';
+    }
+    return stripCommonIndent(content);
+  };
+
+  // Helper to get content for Right Panel
+  const getRightContent = () => {
+    let content = '';
+    switch (activeRightTab) {
+      case 'intent': content = currentData.analysis?.intent; break;
+      case 'summary': content = currentData.analysis?.summary; break;
+      case 'comparison': content = currentData.analysis?.comparison; break;
+      case 'syntax': content = currentData.analysis?.syntax; break;
+      default: content = '';
+    }
+    return stripCommonIndent(content);
+  };
+
+  // Export handlers
+  const handleExportOriginalWithVerbs = () => {
+    const content = currentData.original?.content;
+    if (!content) {
+      alert('オリジナル本文がありません');
+      return;
+    }
+    const markedContent = markMainVerbs(content);
+
+    const yearData = AVAILABLE_YEARS.find(y => y.id === selectedYearSession);
+    const pastTitle = currentData.past?.title || '';
+    const footer = yearData
+      ? `\n\n[ 類題 ： ${yearData.year}年第${yearData.session}回，”${pastTitle}” ]`
+      : '';
+
+    const output = `# オリジナル本文（主動詞マーク済み）\n\n${markedContent}${footer}`;
+    copyToClipboard(output, 'オリジナル本文（主動詞マーク済み）をコピーしました！');
+  };
+
+  const handleExportOriginalQuestions = () => {
+    const questions = currentData.original?.questions;
+    if (!questions) {
+      alert('オリジナル設問がありません');
+      return;
+    }
+
+    // Extract question design intent from analysis data (original passage only)
+    let questionIntent = '';
+    const intent = currentData.analysis?.intent || '';
+    const comparison = currentData.analysis?.comparison || '';
+
+    // Build the question intent header for AI explanation
+    questionIntent += `## 📌 解説AI向け：作問者の意図と根拠センテンス\n\n`;
+    questionIntent += `> **重要**: 以下は、各設問がどのセンテンス（または段落）に基づいて作成されたかを示す情報です。\n`;
+    questionIntent += `> 学習者を正解へ導く際は、該当するセンテンスに注目させ、論理的に解答を導いてください。\n\n`;
+
+    // Extract question pattern table from comparison (original column only)
+    let hasQuestionPattern = false;
+    if (comparison) {
+      // Look for table rows containing 設問1, 設問2, etc.
+      const tableRows = comparison.match(/\| \*\*設問[0-9]+\*\* \|[^\n]+/g);
+      if (tableRows && tableRows.length > 0) {
+        hasQuestionPattern = true;
+        questionIntent += `### 設問パターン概要\n`;
+        questionIntent += `| 設問 | 注目すべきポイント | 対応パラグラフ |\n`;
+        questionIntent += `| :--- | :--- | :--- |\n`;
+
+        tableRows.forEach(row => {
+          // Extract question number and original column (3rd column, skipping past-exam column)
+          const columns = row.split('|').map(col => col.trim()).filter(col => col);
+          if (columns.length >= 3) {
+            const questionNum = columns[0]; // e.g., **設問1**
+            const originalContent = columns[2]; // Original column (3rd)
+            // Extract paragraph info from the content
+            const paraMatch = originalContent.match(/\(Para \d+\)/);
+            const para = paraMatch ? paraMatch[0] : '';
+            const content = originalContent.replace(/\(Para \d+\)/, '').trim();
+            questionIntent += `| ${questionNum} | ${content} | ${para} |\n`;
+          }
+        });
+        questionIntent += `\n`;
+      }
+    }
+
+    // Fallback: Generate template from questions if no pattern found in comparison
+    if (!hasQuestionPattern) {
+      // Count questions from the questions text (look for **(1)**, **(2)**, etc. or **(25)**, **(26)**, etc.)
+      const questionMatches = questions.match(/\*\*\((\d+)\)\*\*/g);
+      if (questionMatches && questionMatches.length > 0) {
+        questionIntent += `### 設問パターン概要\n`;
+        questionIntent += `| 設問 | 注目すべきポイント | 対応パラグラフ |\n`;
+        questionIntent += `| :--- | :--- | :--- |\n`;
+
+        questionMatches.forEach((match, index) => {
+          const paraNum = index + 1;
+          questionIntent += `| **設問${index + 1}** | 【要確認：本文を分析して記入】 | (Para ${paraNum}) |\n`;
+        });
+        questionIntent += `\n`;
+        questionIntent += `> ⚠️ 上記は自動生成されたテンプレートです。本文を分析して「注目すべきポイント」を具体的に記入してください。\n\n`;
+      }
+    }
+
+    // Add paragraph structure info from intent if available
+    if (intent) {
+      const paraStructureMatch = intent.match(/\*\*パラグラフ構成:\*\*[\s\S]*?(?=\*\*[0-9]|\n\n\*\*[0-9]|$)/);
+      if (paraStructureMatch) {
+        questionIntent += `### パラグラフ構成と設問の対応\n`;
+        questionIntent += paraStructureMatch[0].replace('**パラグラフ構成:**', '').trim();
+        questionIntent += `\n\n`;
+      }
+    }
+
+    questionIntent += `---\n\n`;
+
+    const output = questionIntent + questions;
+    copyToClipboard(output, 'オリジナル設問（作問意図付き）をコピーしました！');
+  };
+
+  const handleExportSyntaxTemplate = () => {
+    const content = currentData.original?.content;
+    const title = currentData.original?.title;
+    if (!content) {
+      alert('オリジナル本文がありません');
+      return;
+    }
+    const template = generateSyntaxTemplate(content, title || 'Original Passage');
+    copyToClipboard(template, '構文解説テンプレートをコピーしました！');
+  };
+
+  const handleExportAll = () => {
+    const content = currentData.original?.content;
+    const questions = currentData.original?.questions;
+    const title = currentData.original?.title;
+
+    if (!content) {
+      alert('データがありません');
+      return;
+    }
+
+    const markedContent = markMainVerbs(content);
+
+    // Use existing syntax analysis if available, otherwise generate template
+    const existingSyntax = currentData.analysis?.syntax;
+    const syntaxSectionTitle = existingSyntax ? '4. 構文解説 (Syntax Analysis)' : '4. 構文解説テンプレート';
+    const syntaxContent = existingSyntax || generateSyntaxTemplate(content, title || 'Original Passage');
+
+    const summary = currentData.analysis?.summary || '';
+
+    const translations = currentData.original?.translations || [];
+    const translationSection = translations.length > 0
+      ? `\n## 5. センテンス別和訳 (Sentence Translations)\n\n` +
+      translations.map((t, i) => `${i + 1}. ${t.en}\n   和訳: ${t.ja}`).join('\n\n')
+      : '\n## 5. センテンス別和訳 (Sentence Translations)\n\n（翻訳データなし）';
+
+    const yearData = AVAILABLE_YEARS.find(y => y.id === selectedYearSession);
+    const pastTitle = currentData.past?.title || '';
+
+    // Determine venue type (Main or Semi-Venue) based on ID convention or Label
+    const isSemiVenue = selectedYearSession.includes('jun') || yearData?.label?.includes('準会場');
+    const venueType = isSemiVenue ? '準会場' : '本会場';
+
+    // Construct the reference line requested by user:
+    // 「類題：YYYY年第＃回 (本会場or準会場，本文のタイトル」
+    const referenceHeader = yearData
+      ? `類題：${yearData.year}年第${yearData.session}回 (${venueType}，${pastTitle})`
+      : '';
+
+    const footer = yearData
+      ? `\n\n[ 類題 ： ${yearData.year}年第${yearData.session}回，”${pastTitle}” ]`
+      : '';
+
+    const output = [
+      referenceHeader, // Added at the very top as requested
+      `# ${title || 'Original Passage'} - Complete Data`,
+      `\n## 1. オリジナル本文（主動詞マーク済み）\n\n${markedContent}${footer}`,
+      `\n## 2. オリジナル設問\n\n${questions || '（設問データなし）'}`,
+      `\n## 3. 本文要約\n\n${summary || '（要約データなし）'}`,
+      `\n## ${syntaxSectionTitle}\n\n${syntaxContent}`,
+      translationSection
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    copyToClipboard(output, '全データを一括コピーしました！');
+  };
+
+  const handleExportAllPast = () => {
+    const content = currentData.past?.content;
+    const questions = currentData.past?.questions;
+    const title = currentData.past?.title;
+
+    if (!content) {
+      alert('データがありません');
+      return;
+    }
+
+    const syntax = currentData.analysis?.syntax || '';
+
+    const translations = currentData.past?.translations || [];
+    const translationSection = translations.length > 0
+      ? `\n## 4. センテンス別和訳 (Sentence Translations)\n\n` +
+      translations.map((t, i) => `${i + 1}. ${t.en}\n   和訳: ${t.ja}`).join('\n\n')
+      : '\n## 4. センテンス別和訳 (Sentence Translations)\n\n（翻訳データなし）';
+
+    // Construct Header
+    const yearData = AVAILABLE_YEARS.find(y => y.id === selectedYearSession);
+    const headerTitle = yearData ? `${yearData.year}年度 第${yearData.session}回 - ${title}` : title;
+
+    const output = [
+      `# ${headerTitle} - Complete Data (Past)`,
+      `\n## 1. 過去問本文\n\n${content}`,
+      `\n## 2. 過去問設問\n\n${questions || '（設問データなし）'}`,
+      `\n## 3. 構文解説 (Syntax Analysis)\n\n${syntax}`,
+      translationSection
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    copyToClipboard(output, '過去問データを一括コピーしました！（要約・比較なし）');
+  };
+
+  const handleExportTranslations = () => {
+    const translations = currentData.original?.translations || [];
+    const title = currentData.original?.title || 'Original Passage';
+
+    if (translations.length === 0) {
+      alert('翻訳データがありません');
+      return;
+    }
+
+    const output = `# ${title} - センテンス別和訳\n\n` +
+      translations.map((t, i) => `${i + 1}. ${t.en}\n   和訳: ${t.ja}`).join('\n\n');
+
+    copyToClipboard(output, 'センテンス別和訳をコピーしました！');
+  };
+
+  // --- Render Components ---
+
+  // Print Handler
+  const handlePrint = (type) => {
+    const data = type === 'past' ? currentData.past : currentData.original;
+    if (!data || !data.content) {
+      alert('データがありません');
+      return;
+    }
+
+    const yearData = AVAILABLE_YEARS.find(y => y.id === selectedYearSession);
+    const yearStr = yearData ? `${yearData.year}年度 第${yearData.session}回` : '';
+    const pastTitle = currentData.past?.title || '';
+
+    // Determine Grade Label based on ID prefix
+    // Default to Pre-1st Grade for this workspace
+    const gradeLabel = '英検2級';
+
+    // Header & Footer logic
+    let headerText = '問題2';
+    let contentFooterHtml = '';
+    let pageFooterHtml = '';
+
+    // Default styles
+    let passageFontSize = '12px';
+    let passageLineHeight = '1.6';
+
+    let title = data.title || '';
+    let contentBody = data.content.replace(/^## .+\n/, '').trim();
+
+    // Separate sizing logic for Passage (Left) and Questions (Right)
+    const len = contentBody.length;
+    let questionFontSize = '10px';
+    let questionLineHeight = '1.2';
+
+    if (len < 1000) {
+      passageFontSize = '15px';
+      passageLineHeight = '1.8';
+      questionFontSize = '12px';
+      questionLineHeight = '1.3';
+    } else if (len < 1500) {
+      passageFontSize = '14px';
+      passageLineHeight = '1.7';
+      questionFontSize = '12px';
+      questionLineHeight = '1.25';
+    } else if (len < 2000) {
+      passageFontSize = '13px';
+      passageLineHeight = '1.6';
+      questionFontSize = '12px';
+      questionLineHeight = '1.2';
+    } else if (len < 2500) {
+      passageFontSize = '12px';
+      passageLineHeight = '1.5';
+      questionFontSize = '12px';
+      questionLineHeight = '1.2';
+    } else {
+      // Very long content (> 2500 chars)
+      passageFontSize = '12px';
+      passageLineHeight = '1.25';
+      questionFontSize = '12px';
+      questionLineHeight = '1.2';
+    }
+
+    let isOriginal = type === 'original';
+    if (isOriginal) {
+      headerText = `${gradeLabel}オリジナル問題`;
+
+      contentFooterHtml = `
+        <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid #ccc; text-align: left; font-size: 10px; color: #555; font-family: 'Hiragino Mincho ProN', serif;">
+          <span style="font-weight: bold;">類題 ：</span> ${yearStr} <span style="font-style: italic;">${pastTitle}</span>
+        </div>
+      `;
+
+      pageFooterHtml = `
+        <div class="copyright-footer">ECCベストワン藍住・北島中央</div>
+      `;
+    } else {
+      // Past questions default
+      headerText = `${yearStr}`;
+    }
+
+
+    // Parse Questions and Extract Answer Key (from text)
+    let questionsText = data.questions || '';
+    let answerKey = '';
+
+    // Attempt to find Answer Key at the end
+    const answerMatch = questionsText.match(/(?:\*\*|)?Answer Key(?:\*\*|):?[:\s]+(.*)$/i);
+    if (answerMatch) {
+      answerKey = answerMatch[1].trim();
+      questionsText = questionsText.substring(0, answerMatch.index).trim();
+      questionsText = questionsText.replace(/-{3,}\s*$/, '').trim();
+    }
+
+    const parseQuestions = (qText) => {
+      // Remove header if present
+      const cleanText = qText.replace(/^### Questions\s*/i, '');
+
+      // Flexible split for (N) or **(N)
+      // Matches: (1), **(1), **(1)**, etc. starting at line beginning (or after newline)
+      // Captures the number.
+      const parts = cleanText.split(/(?:^|\n)\s*(?:\*\*)?\s*\((\d+)\)/);
+
+      const questions = [];
+
+      // parts[0] is typically empty preamble.
+      // parts[1] is number, parts[2] is content.
+      for (let i = 1; i < parts.length; i += 2) {
+        const num = parts[i];
+        const rest = parts[i + 1];
+        if (!num || !rest) continue;
+
+        const optionSplit = rest.split(/(?=\n?1\.\s|\s1\s)/);
+
+        let qContent = optionSplit[0].trim();
+        // Remove trailing ** if present (from **(1) text**)
+        qContent = qContent.replace(/\*\*$/, '').trim();
+
+        const optionsRaw = optionSplit.slice(1).join("").trim();
+        const options = optionsRaw.split(/\n/).map(o => o.trim()).filter(o => o);
+
+        questions.push({ num, text: qContent, options });
+      }
+      return questions;
+    };
+
+    let questionsHtmlContent = '';
+    try {
+      const parsedQuestions = parseQuestions(questionsText);
+      if (parsedQuestions.length === 0) throw new Error('Parsing failed');
+
+      questionsHtmlContent = parsedQuestions.map((q, idx) => `
+        <div class="q-row" style="${idx !== parsedQuestions.length - 1 ? 'border-bottom: 1px dashed #ccc;' : ''} padding: 0.5em 0; display: flex; align-items: flex-start;">
+          <div class="q-num-col" style="width: 24px; padding: 2px 0; background-color: #f3f4f6; color: #374151; flex-shrink: 0; display: flex; align-items: flex-start; justify-content: center; font-weight: bold; font-family: sans-serif; font-size: ${parseFloat(questionFontSize) - 1}px; margin-right: 8px;">
+            (${q.num})
+          </div>
+          <div class="q-content-col" style="flex-grow: 1;">
+            <div class="q-text" style="font-weight: bold; page-break-inside: avoid; margin-bottom: 0.4em; font-family: 'Times New Roman', serif; font-size: ${questionFontSize}; line-height: ${questionLineHeight}; text-align: justify;">${q.text}</div>
+            <div class="q-options" style="font-size: ${questionFontSize}; font-family: 'Times New Roman', serif; line-height: ${questionLineHeight};">
+              ${q.options.map(opt => `<div style="margin-bottom: 0;">${opt}</div>`).join('')}
+            </div>
           </div>
         </div>
-        <div className={`split-pane right-pane ${activeTab === 'result' ? 'mobile-visible' : 'mobile-hidden'}`}>
-          <h2>解説・解答</h2>
-          <ResultDisplay result={result} loading={loading} speechRate={speechRate} />
-        </div>
-      </main>
+      `).join('');
 
-      {!isUiFocused && (
-        <nav className="mobile-bottom-nav">
-          <button
-            className={activeTab === 'input' ? 'active' : ''}
-            onClick={() => setActiveTab('input')}
-          >
-            <span className="nav-icon">📷</span>
-            カメラ・入力
-          </button>
-          <button
-            className={activeTab === 'result' ? 'active' : ''}
-            onClick={() => setActiveTab('result')}
-          >
-            <span className="nav-icon">📖</span>
-            解説表示
-          </button>
-        </nav>
+    } catch (e) {
+      const toHtml = (text) => text ? text
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '<p></p>')
+        .replace(/\n/g, '<br>') : '';
+      questionsHtmlContent = toHtml(questionsText);
+    }
+
+    let rightColumnContent = `
+       <div class="questions-container" style="display: flex; flex-direction: column; flex-grow: 1;">
+          <div style="font-family: 'Times New Roman', serif; font-weight: bold; font-size: 14px; border-bottom: 1px solid #000; margin-bottom: 10px; padding-bottom: 2px;">Questions</div>
+          ${questionsHtmlContent}
+          ${answerKey ? `
+            <div style="margin-top: auto; text-align: right; font-weight: bold; font-family: 'Times New Roman', serif; font-size: 11px; border-top: 2px solid #333; padding-top: 4px;">
+              正解: ${answerKey.replace(/Answer Key:?/i, '').trim()}
+            </div>
+          ` : ''}
+       </div>
+    `;
+
+    const toHtml = (text) => {
+      if (!text) return '';
+      // Split by double newline to identify paragraphs
+      const paragraphs = text.split(/\n\s*\n/);
+      return paragraphs.map(p => {
+        let innerHtml = p.trim();
+        if (!innerHtml) return '';
+
+        if (innerHtml.match(/^### /)) return innerHtml.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        if (innerHtml.match(/^## /)) return innerHtml.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+
+        innerHtml = innerHtml
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+
+        return `<p>${innerHtml}</p>`;
+      }).join('');
+    };
+
+    const contentHtml = toHtml(contentBody) + contentFooterHtml;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Preview ${type}</title>
+          <style>
+            @media print {
+              @page { size: A4 landscape; margin: 0; }
+              body { -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
+              .no-print { display: none !important; }
+              .preview-container { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                width: 297mm !important; 
+                height: 210mm !important; 
+                padding: 10mm 12mm !important; 
+                overflow: hidden !important;
+              }
+              .copyright-footer {
+                 position: fixed;
+                 bottom: 5mm;
+                 right: 12mm;
+                 text-align: right;
+                 font-size: 9px;
+                 color: #555;
+                 font-family: "Hiragino Mincho ProN", serif;
+              }
+            }
+            body { 
+              font-family: "Times New Roman", "Hiragino Mincho ProN", serif; 
+              color: #000;
+              margin: 0;
+              padding: 20px;
+              background-color: #555; 
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              min-height: 100vh;
+            }
+            .preview-container {
+              background-color: white;
+              width: 297mm; 
+              height: 210mm; 
+              padding: 10mm 12mm;
+              box-sizing: border-box;
+              box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+              display: flex; 
+              gap: 20mm; 
+              overflow: hidden; 
+              position: relative;
+            }
+            .page-column { 
+              flex: 1; 
+              display: flex;
+              flex-direction: column;
+              height: 100%;
+              overflow: hidden;
+            }
+            .header-label { 
+              font-size: 10px; 
+              margin-bottom: 0.5rem; 
+              font-family: sans-serif;
+              font-weight: bold;
+              color: #555;
+            }
+            .title { 
+              text-align: center; 
+              font-size: 16px; 
+              font-weight: bold; 
+              margin-bottom: 1rem; 
+              font-family: sans-serif;
+            }
+            .passage { 
+              text-align: justify; 
+              font-size: ${passageFontSize}; 
+              line-height: ${passageLineHeight};
+              flex-grow: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: flex-start;
+            }
+            p { margin-bottom: 0.8em; text-indent: 1em; margin-top: 0; }
+            button {
+              padding: 10px 20px; 
+              font-size: 16px; 
+              cursor: pointer; 
+              background: #2563eb; 
+              color: white; 
+              border: none; 
+              border-radius: 4px; 
+              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+              font-weight: bold;
+            }
+            .copyright-footer {
+               position: absolute;
+               bottom: 5mm;
+               right: 12mm;
+               text-align: right;
+               font-size: 9px;
+               color: #555;
+               font-family: "Hiragino Mincho ProN", serif;
+            }
+            .q-row { page-break-inside: avoid; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="margin-bottom: 20px; position: sticky; top: 20px; z-index: 100;">
+            <button onclick="window.print()">🖨️ このページを印刷 (A4横)</button>
+          </div>
+          
+          <div class="preview-container">
+            <div class="page-column">
+              <div class="header-label">${headerText}</div>
+              <div class="title">${title}</div>
+              <div class="passage">
+                ${contentHtml}
+              </div>
+            </div>
+            
+            <div class="page-column" style="border-left: 1px dotted #ccc; padding-left: 10mm; margin-left: -1px;">
+              ${rightColumnContent}
+            </div>
+            ${pageFooterHtml}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const HeaderComponent = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, color: 'white' }}>
+          英検2級 PassageCraft
+        </h2>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button
+          onClick={() => handlePrint('past')}
+          style={{
+            background: 'white', color: '#2563eb', border: 'none', borderRadius: '4px',
+            padding: '4px 12px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold'
+          }}
+        >
+          🖨️ 過去問
+        </button>
+        <button
+          onClick={() => handlePrint('original')}
+          style={{
+            background: 'white', color: '#16a34a', border: 'none', borderRadius: '4px',
+            padding: '4px 12px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold'
+          }}
+        >
+          🖨️ オリジナル
+        </button>
+
+        <label className="header-label">対象回:</label>
+        <select
+          className="header-select"
+          value={selectedYearSession}
+          onChange={(e) => setSelectedYearSession(e.target.value)}
+        >
+          {AVAILABLE_YEARS.map((y, index) => (
+            y.type === "separator" ? (
+              <option key={`sep-${index}`} disabled style={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>
+                {y.label}
+              </option>
+            ) : (
+              <option key={y.id} value={y.id}>
+                {y.label || `${y.year}年度 第${y.session}回`}
+              </option>
+            )
+          ))}
+        </select>
+      </div>
+    </>
+  );
+
+  const LeftColumnComponent = (
+    <>
+      <Tabs
+        tabs={leftTabs}
+        activeTab={activeLeftTab}
+        onTabChange={setActiveLeftTab}
+      />
+      <div
+        className="content-area"
+        onClick={handleBackgroundClick}
+        style={{ minHeight: '500px' }} // Ensure clickable area
+      >
+        <MarkdownRenderer
+          text={getLeftContent()}
+          onSentenceClick={handleSentenceClickInteraction}
+          highlightedSentence={highlightedSentence}
+          translations={
+            activeLeftTab === 'past' ? currentData.past?.translations :
+              activeLeftTab === 'original' ? currentData.original?.translations :
+                []
+          }
+        />
+      </div>
+    </>
+  );
+
+  const RightColumnComponent = (
+    <>
+      <Tabs
+        tabs={rightTabs}
+        activeTab={activeRightTab}
+        onTabChange={setActiveRightTab}
+      />
+      <div
+        className="content-area"
+        onClick={handleBackgroundClick}
+        style={{ minHeight: '500px' }}
+      >
+        <MarkdownRenderer
+          text={getRightContent()}
+          onSentenceClick={handleSyntaxClick} // Pass click handler
+        />
+      </div>
+    </>
+  );
+
+  // Export Panel Component
+  const ExportPanel = (
+    <div style={{
+      padding: '1rem',
+      backgroundColor: 'var(--bg-secondary)',
+      borderTop: '1px solid var(--border-color)',
+      display: 'flex',
+      gap: '1rem',
+      flexWrap: 'wrap',
+      justifyContent: 'center'
+    }}>
+      <ExportButton
+        label="📦 全てコピー (オリジナル)"
+        onClick={handleExportAll}
+        icon="📋"
+      />
+      <ExportButton
+        label="📚 全てコピー (過去問)"
+        onClick={handleExportAllPast}
+        icon="🏛️"
+      />
+      <div style={{ width: '1px', backgroundColor: 'var(--border-color)', margin: '0 0.5rem' }}></div>
+      <ExportButton
+        label="本文（動詞マーク）"
+        onClick={handleExportOriginalWithVerbs}
+        icon="📝"
+      />
+      <ExportButton
+        label="設問"
+        onClick={handleExportOriginalQuestions}
+        icon="❓"
+      />
+      <ExportButton
+        label="和訳 (1:1)"
+        onClick={handleExportTranslations}
+        icon="🌐"
+      />
+      <ExportButton
+        label="構文解説テンプレート"
+        onClick={handleExportSyntaxTemplate}
+        icon="📊"
+      />
+    </div>
+  );
+
+  return (
+    <>
+      <MainLayout
+        header={HeaderComponent}
+        leftColumn={LeftColumnComponent}
+        rightColumn={RightColumnComponent}
+        footer={ExportPanel}
+      />
+      {tooltip.visible && createPortal(
+        <div
+          ref={tooltipRef}
+          className="translation-tooltip"
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y}px`,
+            transform: 'translateX(-50%) translateY(-100%)'
+          }}
+        >
+          {tooltip.text}
+        </div>,
+        document.body
       )}
     </>
   );
