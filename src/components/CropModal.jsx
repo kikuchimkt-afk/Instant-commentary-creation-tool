@@ -25,8 +25,14 @@ const CropModal = ({ src, onCreateCrop, onCancel }) => {
 
     function onImageLoad(e) {
         const { width, height } = e.currentTarget;
-        // No aspect ratio enforced, free crop
-        setCrop(centerAspectCrop(width, height, 16 / 9));
+        // Set default crop to full image
+        setCrop({
+            unit: '%',
+            width: 100,
+            height: 100,
+            x: 0,
+            y: 0
+        });
     }
 
     const getCroppedImg = () => {
