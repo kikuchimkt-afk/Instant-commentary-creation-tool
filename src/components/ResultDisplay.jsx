@@ -25,6 +25,31 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
         return () => clearInterval(interval);
     }, [loading]);
 
+    const splitIntoSentences = (text) => {
+        const abbreviations = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "U.S.", "e.g.", "i.e.", "etc.", "vs.", "St."];
+        let tempText = text;
+
+        // Temporarily replace dots in common abbreviations to prevent incorrect splitting
+        abbreviations.forEach((abbr, i) => {
+            const placeholder = `__ABBR${i}__`;
+            const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.')}`, 'g');
+            tempText = tempText.replace(regex, placeholder);
+        });
+
+        // Split by punctuation (!, ?, .) followed by whitespace
+        const sentences = tempText.split(/(?<=[.!?])\s+/);
+
+        // Restore abbreviations and return cleaned sentences
+        return sentences.map(s => {
+            let restored = s;
+            abbreviations.forEach((abbr, i) => {
+                const placeholder = `__ABBR${i}__`;
+                restored = restored.replace(new RegExp(placeholder, 'g'), abbr);
+            });
+            return restored.trim();
+        }).filter(s => s.length > 2 && /[a-zA-Z]/.test(s));
+    };
+
     const speakText = (text) => {
         if (!text) return;
 
@@ -32,19 +57,20 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
         window.speechSynthesis.cancel();
 
         // Remove Japanese characters (Hiragana, Katakana, Kanji, punctuation)
-        // This is a rough filter to keep English sentences
-        const englishOnlyText = text.replace(/[ぁ-んァ-ヶ亜-熙。、、「」]/g, '').trim();
+        const englishOnlyText = text.replace(/[ぁ-んァ-ヶ亜-熙。、、「」]/g, ' ').trim();
 
-        // If no meaningful English is left (e.g. only symbols or very short), don't speak
-        if (englishOnlyText.length < 3 || !/[a-zA-Z]/.test(englishOnlyText)) return;
+        // Split into smart sentences
+        const sentences = splitIntoSentences(englishOnlyText);
 
-        const utterance = new SpeechSynthesisUtterance(englishOnlyText);
+        if (sentences.length === 0) return;
 
-        // Apply speech rate
-        utterance.rate = speechRate;
-        utterance.lang = 'en-US';
-
-        window.speechSynthesis.speak(utterance);
+        // Queue each sentence separately for natural pauses
+        sentences.forEach((sentence) => {
+            const utterance = new SpeechSynthesisUtterance(sentence);
+            utterance.rate = speechRate;
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        });
     };
 
     const handleContainerClick = (e) => {

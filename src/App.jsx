@@ -17,6 +17,7 @@ function App() {
   const [customInstructions, setCustomInstructions] = useState(localStorage.getItem('ai_instructions') || "");
   const [activeTab, setActiveTab] = useState('input'); // 'input' or 'result'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUiFocused, setIsUiFocused] = useState(false); // New: track camera/crop modal activity
 
   const PRESETS = [
     { label: "標準", value: "" },
@@ -141,14 +142,16 @@ function App() {
         </div>
       </header>
 
-      {/* Floating Settings Button for Mobile */}
-      <button
-        className="mobile-fab-settings"
-        onClick={() => setIsSettingsOpen(true)}
-        aria-label="Settings"
-      >
-        ⚙️
-      </button>
+      {/* Floating Settings Button - Hide when UI is focused on camera/crop */}
+      {!isUiFocused && (
+        <button
+          className="mobile-fab-settings"
+          onClick={() => setIsSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
+      )}
 
       {/* Settings Drawer for Mobile */}
       {isSettingsOpen && (
@@ -258,7 +261,10 @@ function App() {
               </div>
             )}
 
-            <CameraInput onAddPage={handleAddPage} />
+            <CameraInput
+              onAddPage={handleAddPage}
+              onFocusChange={setIsUiFocused} // Pass state update to hid nav
+            />
 
             <section className="custom-instructions-area" style={{ marginTop: '1.5rem', marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
               <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#555' }}>AIへの追加指示</h3>
@@ -283,20 +289,25 @@ function App() {
           </section>
 
           <div className="action-bar">
-            <button
-              onClick={handleGenerate}
-              disabled={images.length === 0 || loading}
-              className="generate-btn"
-            >
-              {loading ? '作成中...' : '解説を作成する ✨'}
-            </button>
-            <button
-              onClick={handlePrintPreview}
-              disabled={images.length === 0 || !result}
-              className="mobile-hidden print-btn"
-            >
-              印刷 🖨️
-            </button>
+            {/* If focused, action bar is hidden to let camera/trim take full space */}
+            {!isUiFocused && (
+              <>
+                <button
+                  onClick={handleGenerate}
+                  disabled={images.length === 0 || loading}
+                  className="generate-btn"
+                >
+                  {loading ? '作成中...' : '解説を作成する ✨'}
+                </button>
+                <button
+                  onClick={handlePrintPreview}
+                  disabled={images.length === 0 || !result}
+                  className="mobile-hidden print-btn"
+                >
+                  印刷 🖨️
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className={`split-pane right-pane ${activeTab === 'result' ? 'mobile-visible' : 'mobile-hidden'}`}>
@@ -305,22 +316,24 @@ function App() {
         </div>
       </main>
 
-      <nav className="mobile-bottom-nav">
-        <button
-          className={activeTab === 'input' ? 'active' : ''}
-          onClick={() => setActiveTab('input')}
-        >
-          <span className="nav-icon">📷</span>
-          カメラ・入力
-        </button>
-        <button
-          className={activeTab === 'result' ? 'active' : ''}
-          onClick={() => setActiveTab('result')}
-        >
-          <span className="nav-icon">📖</span>
-          解説表示
-        </button>
-      </nav>
+      {!isUiFocused && (
+        <nav className="mobile-bottom-nav">
+          <button
+            className={activeTab === 'input' ? 'active' : ''}
+            onClick={() => setActiveTab('input')}
+          >
+            <span className="nav-icon">📷</span>
+            カメラ・入力
+          </button>
+          <button
+            className={activeTab === 'result' ? 'active' : ''}
+            onClick={() => setActiveTab('result')}
+          >
+            <span className="nav-icon">📖</span>
+            解説表示
+          </button>
+        </nav>
+      )}
     </>
   );
 }

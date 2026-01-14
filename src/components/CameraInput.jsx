@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import CropModal from './CropModal';
 
-const CameraInput = ({ onAddPage }) => {
+const CameraInput = ({ onAddPage, onFocusChange }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -10,6 +10,13 @@ const CameraInput = ({ onAddPage }) => {
     // Cropping State
     const [tempImage, setTempImage] = useState(null);
     const [showCropModal, setShowCropModal] = useState(false);
+
+    // Notify parent about focus change
+    useEffect(() => {
+        if (onFocusChange) {
+            onFocusChange(isCameraOpen || showCropModal);
+        }
+    }, [isCameraOpen, showCropModal, onFocusChange]);
 
     // Initialize camera stream when isCameraOpen becomes true
     useEffect(() => {
@@ -108,7 +115,7 @@ const CameraInput = ({ onAddPage }) => {
     return (
         <div className="camera-input">
             <div className="image-container">
-                {!isCameraOpen && (
+                {!isCameraOpen && !showCropModal && (
                     <div className="placeholder-text">
                         <p>ここに画像をペースト (Ctrl+V)</p>
                         <p>または</p>
@@ -117,14 +124,14 @@ const CameraInput = ({ onAddPage }) => {
                 )}
 
                 {isCameraOpen && (
-                    <video ref={videoRef} playsInline style={{ width: '100%', height: '100%' }} />
+                    <video ref={videoRef} playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 )}
 
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
             </div>
 
             <div className="controls">
-                {!isCameraOpen && (
+                {!isCameraOpen && !showCropModal && (
                     <button onClick={startCamera}>カメラを起動</button>
                 )}
 
