@@ -9,12 +9,17 @@ import './print.css';
 import './crop_modal.css';
 import './index.css';
 
+const VALID_MODELS = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash-exp"];
+
 function App() {
   const [images, setImages] = useState([]);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || "");
-  const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-1.5-flash");
+  const [model, setModel] = useState(() => {
+    const savedModel = localStorage.getItem('gemini_model');
+    return VALID_MODELS.includes(savedModel) ? savedModel : "gemini-1.5-flash";
+  });
 
   // New State for Multi-step
   const [progress, setProgress] = useState(0);
@@ -108,8 +113,7 @@ function App() {
           >
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
-            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
           </select>
           <input
             type="password"
