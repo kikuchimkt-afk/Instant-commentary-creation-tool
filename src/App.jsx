@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import CameraInput from './components/CameraInput';
 import ResultDisplay from './components/ResultDisplay';
-import { generateExplanation } from './services/gemini';
+import { generateExplanationStepped } from './services/gemini';
 import PrintLayout from './components/PrintLayout';
+import ProgressBar from './components/ProgressBar';
+import AdditionalInstructions from './components/AdditionalInstructions';
 import './print.css';
 import './crop_modal.css';
 import './index.css';
@@ -13,6 +15,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || "");
   const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-1.5-flash");
+
+  // New State for Multi-step
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [additionalInstructions, setAdditionalInstructions] = useState("");
 
   // Simple "Routing" based on URL query parameter
   // Hooks must be called before this conditional return
@@ -52,17 +59,30 @@ function App() {
     }
 
     setLoading(true);
+    setProgress(0);
+    setStatusMessage("開始中...");
+
     try {
       // Extract base64 part
       const base64Images = images.map(img => img.split(',')[1]);
 
-      const text = await generateExplanation(apiKey, base64Images, model);
+      const text = await generateExplanationStepped(
+        apiKey,
+        base64Images,
+        model,
+        additionalInstructions,
+        (percent, message) => {
+          setProgress(percent);
+          setStatusMessage(message);
+        }
+      );
       setResult(text);
     } catch (error) {
       console.error(error);
       alert(`解説の作成に失敗しました。\n詳細: ${error.message}`);
     } finally {
       setLoading(false);
+      setProgress(100);
     }
   };
 
@@ -128,6 +148,15 @@ function App() {
           </div>
 
           <CameraInput onAddPage={handleAddPage} />
+
+          <AdditionalInstructions
+            value={additionalInstructions}
+            onChange={setAdditionalInstructions}
+          />
+
+          {loading && (
+            <ProgressBar progress={progress} message={statusMessage} />
+          )}
 
           <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', gap: '10px' }}>
             <button
