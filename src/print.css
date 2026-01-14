@@ -1,8 +1,9 @@
 /* Print Styles */
 @media print {
     @page {
-        size: A4 landscape;
-        margin: 1cm;
+        /* size: A4 landscape;  Removed to allow user to control Paper Size, Orientation, and Scale in print dialog */
+        /* margin: 1cm; Let user control margins or set default here, but size should be flexible */
+        margin: 10mm;
     }
 
     body {
@@ -21,17 +22,39 @@
         width: 100%;
         text-align: center;
     }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .print-title-container {
+        margin-top: 0 !important;
+        /* Start at top of page in print */
+        margin-bottom: 1rem;
+    }
+}
+
+/* Screen styles for the print window */
+.print-title-container {
+    margin-top: 4rem;
+    /* Clear the fixed header on screen */
+    margin-bottom: 1rem;
+    text-align: left;
+    padding: 0;
 }
 
 /* Screen styles for the print window to look correct before printing */
 /* Screen styles for the print window to look correct before printing */
 .print-layout {
     width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
     box-sizing: border-box;
     padding: 1cm;
     position: relative;
     /* For footer positioning */
+    padding-bottom: 3rem;
+    /* Ensure space for footer */
 }
 
 .print-content {
@@ -40,8 +63,15 @@
     /* Increased gap */
     column-rule: 1px dotted #ccc;
     /* Dotted line separator */
-    height: 95%;
-    /* Leave room for footer */
+    /* Allow regular flow */
+}
+
+.problem-section {
+    break-after: column;
+}
+
+.explanation-section {
+    /* break-before: column; Removed to allow dynamic flow if problem section is hidden */
 }
 
 .print-footer {
