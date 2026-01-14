@@ -21,14 +21,7 @@ const PrintLayout = () => {
         return { images, result: savedResult };
     });
 
-    useEffect(() => {
-        // Auto print dialog
-        if ((data.images.length > 0) || data.result) {
-            setTimeout(() => {
-                window.print();
-            }, 1000);
-        }
-    }, [data]);
+    // Automatic print removed as per user request to avoid duplicate dialogs and allow manual triggering.
 
     return (
         <div className="print-layout">

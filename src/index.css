@@ -259,6 +259,8 @@ button:disabled {
     height: calc(100dvh - 50px - 70px);
     /* Use dvh for mobile viewports */
     overflow: hidden;
+    position: relative;
+    overscroll-behavior: none;
   }
 
   .split-pane {
@@ -274,28 +276,53 @@ button:disabled {
     overflow-y: auto;
     padding: 1rem;
     -webkit-overflow-scrolling: touch;
+    padding-bottom: 2rem;
   }
 
   .action-bar {
-    padding: 0.8rem;
+    padding: 1rem;
     background: white;
     border-top: 1px solid #eee;
     display: flex;
     gap: 10px;
+    z-index: 50;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05);
   }
 
   .generate-btn {
     flex: 1;
-    padding: 1rem !important;
+    padding: 1.1rem !important;
     font-size: 1.1rem !important;
     border-radius: 12px !important;
-    box-shadow: 0 4px 12px rgba(100, 108, 255, 0.3);
+    background: linear-gradient(135deg, var(--primary-color), #8b91ff) !important;
+    box-shadow: 0 4px 15px rgba(100, 108, 255, 0.4);
+    border: none !important;
   }
 
   .left-pane,
   .right-pane {
     border: none;
     flex: 1 1 100%;
+  }
+
+  /* Floating Settings Button */
+  .mobile-fab-settings {
+    position: fixed;
+    right: 20px;
+    bottom: 90px;
+    /* Above the bottom nav */
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    z-index: 200;
+    border: 1px solid #eee;
+    cursor: pointer;
   }
 
   /* Bottom Nav */
@@ -312,6 +339,29 @@ button:disabled {
     z-index: 100;
   }
 
+  .mobile-bottom-nav button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: #888;
+    padding: 0;
+    min-height: auto;
+  }
+
+  .mobile-bottom-nav button.active {
+    color: var(--primary-color);
+  }
+
+  .mobile-bottom-nav button .nav-icon {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+  }
+
   /* Settings Drawer */
   .settings-overlay {
     position: fixed;
@@ -319,7 +369,8 @@ button:disabled {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     z-index: 1000;
     display: flex;
     justify-content: flex-end;
@@ -330,10 +381,10 @@ button:disabled {
     max-width: 320px;
     height: 100%;
     background: white;
-    box-shadow: -5px 0 20px rgba(0, 0, 0, 0.2);
+    box-shadow: -5px 0 25px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    animation: slideIn 0.3s ease-out;
+    animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   @keyframes slideIn {
@@ -347,7 +398,7 @@ button:disabled {
   }
 
   .drawer-header {
-    padding: 1rem;
+    padding: 1.2rem;
     border-bottom: 1px solid #eee;
     display: flex;
     justify-content: space-between;
@@ -363,21 +414,22 @@ button:disabled {
   }
 
   .setting-item {
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
   }
 
   .setting-item label {
     display: block;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
     font-size: 0.9rem;
+    color: #444;
   }
 
   .close-btn {
     background: transparent;
     border: none;
     color: white;
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     padding: 0;
     min-height: auto;
   }
@@ -387,7 +439,8 @@ button:disabled {
 
   .mobile-bottom-nav,
   .settings-toggle,
-  .settings-overlay {
+  .settings-overlay,
+  .mobile-fab-settings {
     display: none !important;
   }
 

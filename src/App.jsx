@@ -138,15 +138,17 @@ function App() {
             value={apiKey}
             onChange={handleApiKeyChange}
           />
-          <button
-            className="settings-toggle"
-            onClick={() => setIsSettingsOpen(true)}
-            style={{ padding: '8px', background: 'transparent' }}
-          >
-            ⚙️
-          </button>
         </div>
       </header>
+
+      {/* Floating Settings Button for Mobile */}
+      <button
+        className="mobile-fab-settings"
+        onClick={() => setIsSettingsOpen(true)}
+        aria-label="Settings"
+      >
+        ⚙️
+      </button>
 
       {/* Settings Drawer for Mobile */}
       {isSettingsOpen && (
@@ -164,16 +166,16 @@ function App() {
                   placeholder="API Key を入力"
                   value={apiKey}
                   onChange={handleApiKeyChange}
-                  style={{ width: '100%', padding: '10px', marginTop: '5px' }}
+                  style={{ width: '100%', padding: '12px', marginTop: '5px', boxSizing: 'border-box' }}
                 />
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>
-                  キーを取得する
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.9rem', color: 'var(--primary-color)', marginTop: '10px', display: 'inline-block' }}>
+                  キーを取得する (Google AI Studio) ↗
                 </a>
               </div>
 
               <div className="setting-item">
                 <label>使用モデル:</label>
-                <select value={model} onChange={handleModelChange} style={{ width: '100%', padding: '10px', marginTop: '5px' }}>
+                <select value={model} onChange={handleModelChange} style={{ width: '100%', padding: '12px', marginTop: '5px' }}>
                   <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                   <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
@@ -190,6 +192,7 @@ function App() {
                       onClick={() => setSpeechRate(rate)}
                       style={{
                         flex: 1,
+                        padding: '10px',
                         background: speechRate === rate ? 'var(--primary-color)' : '#f0f0f0',
                         color: speechRate === rate ? 'white' : '#333'
                       }}
@@ -205,7 +208,7 @@ function App() {
                   onClick={() => setIsSettingsOpen(false)}
                   style={{ width: '100%', padding: '1rem', background: 'var(--primary-color)', color: 'white' }}
                 >
-                  閉じる
+                  設定を閉じる
                 </button>
               </div>
             </div>
@@ -216,31 +219,55 @@ function App() {
       <main className={activeTab}>
         <div className={`split-pane left-pane ${activeTab === 'input' ? 'mobile-visible' : 'mobile-hidden'}`}>
           <section className="scroll-area">
-            <h2>問題 (全 {images.length} ページ)</h2>
-            <div className="images-list" style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '1rem', paddingBottom: '0.5rem' }}>
-              {images.map((img, index) => (
-                <div key={index} style={{ position: 'relative', minWidth: '100px', maxWidth: '150px' }}>
-                  <img src={img} alt={`Page ${index + 1}`} style={{ width: '100%', borderRadius: '4px', border: '1px solid #ddd' }} />
-                  <button
-                    onClick={() => handleDeletePage(index)}
-                    style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: 'white', borderRadius: '50%', width: '20px', height: '20px', padding: 0, fontSize: '10px', minHeight: 'auto', border: '1px solid white', cursor: 'pointer' }}
-                  >
-                    ✕
-                  </button>
-                  <span style={{ fontSize: '0.8rem', display: 'block', textAlign: 'center' }}>P.{index + 1}</span>
+            {images.length > 0 ? (
+              <>
+                <h2>問題 (全 {images.length} ページ)</h2>
+                <div className="images-list" style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '1rem', paddingBottom: '0.5rem' }}>
+                  {images.map((img, index) => (
+                    <div key={index} style={{ position: 'relative', minWidth: '100px', maxWidth: '150px' }}>
+                      <img src={img} alt={`Page ${index + 1}`} style={{ width: '100%', borderRadius: '4px', border: '1px solid #ddd' }} />
+                      <button
+                        onClick={() => handleDeletePage(index)}
+                        style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: 'white', borderRadius: '50%', width: '24px', height: '24px', padding: 0, fontSize: '12px', minHeight: 'auto', border: '2px solid white', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                      <span style={{ fontSize: '0.8rem', display: 'block', textAlign: 'center' }}>P.{index + 1}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="setup-guide" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+                {!apiKey ? (
+                  <div className="guide-card" style={{ marginBottom: '2rem', background: '#fff9e6', border: '1px solid #ffe58f', padding: '1.5rem', borderRadius: '12px' }}>
+                    <h3 style={{ marginTop: 0 }}>Step 1: APIキーの設定 🔑</h3>
+                    <p style={{ fontSize: '0.9rem', color: '#856404' }}>まずは解説を作成するためのGemini APIキーを設定してください。</p>
+                    <button
+                      onClick={() => setIsSettingsOpen(true)}
+                      style={{ background: '#ffc107', color: '#000', border: 'none' }}
+                    >
+                      設定を開く
+                    </button>
+                  </div>
+                ) : null}
+                <div className="guide-card" style={{ background: '#f0f7ff', border: '1px solid #bae7ff', padding: '1.5rem', borderRadius: '12px' }}>
+                  <h3 style={{ marginTop: 0 }}>Step 2: 写真を撮る 📸</h3>
+                  <p style={{ fontSize: '0.9rem', color: '#0050b3' }}>「カメラを起動」を押して、問題を撮影しましょう。</p>
+                </div>
+              </div>
+            )}
+
             <CameraInput onAddPage={handleAddPage} />
 
-            <section className="custom-instructions-area" style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
+            <section className="custom-instructions-area" style={{ marginTop: '1.5rem', marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
               <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#555' }}>AIへの追加指示</h3>
               <div className="preset-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
                 {PRESETS.map(preset => (
                   <button
                     key={preset.label}
                     onClick={() => handleInstructionsChange(preset.value)}
-                    style={{ fontSize: '0.8rem', padding: '4px 8px', background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}
+                    style={{ fontSize: '0.8rem', padding: '6px 10px', background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}
                   >
                     {preset.label}
                   </button>
@@ -250,7 +277,7 @@ function App() {
                 placeholder="例：特に英文法の説明を詳しくして / 文中の英単語リストを作って ..."
                 value={customInstructions}
                 onChange={(e) => handleInstructionsChange(e.target.value)}
-                style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                style={{ width: '100%', minHeight: '80px', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
             </section>
           </section>
@@ -268,7 +295,7 @@ function App() {
               disabled={images.length === 0 || !result}
               className="mobile-hidden print-btn"
             >
-              印刷プレビュー 🖨️
+              印刷 🖨️
             </button>
           </div>
         </div>

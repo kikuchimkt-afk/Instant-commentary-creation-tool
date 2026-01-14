@@ -5,25 +5,67 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.9);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 2000;
+    overscroll-behavior: contain;
 }
 
 .crop-modal-content {
-    background-color: white;
-    padding: 1rem;
-    border-radius: 8px;
-    max-width: 90vw;
-    max-height: 90vh;
+    background-color: #1a1a1a;
+    width: 100vw;
+    height: 100dvh;
+    /* Dynamic viewport height for mobile browsers */
     display: flex;
     flex-direction: column;
+    padding: 0;
+    border-radius: 0;
+}
+
+.crop-modal-content h3 {
+    padding: 1rem;
+    margin: 0;
+    color: white;
+    background: #333;
+    font-size: 1rem;
+}
+
+.crop-image-area {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    background: #000;
 }
 
 .crop-actions {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 1rem;
+    gap: 1rem;
+    padding: 1.2rem;
+    background-color: #333;
+    justify-content: center;
+}
+
+.crop-actions button {
+    flex: 1;
+    max-width: 200px;
+    padding: 0.8rem;
+    font-size: 1.1rem;
+    border-radius: 8px;
+}
+
+.crop-cancel-btn {
+    background-color: #666 !important;
+}
+
+@media (min-width: 769px) {
+    .crop-modal-content {
+        width: 80vw;
+        height: 80vh;
+        border-radius: 12px;
+    }
 }

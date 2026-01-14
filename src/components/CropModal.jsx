@@ -69,22 +69,24 @@ const CropModal = ({ src, onCreateCrop, onCancel }) => {
         <div className="crop-modal-overlay">
             <div className="crop-modal-content">
                 <h3>画像をトリミング</h3>
-                <div style={{ maxHeight: '60vh', overflow: 'auto', marginBottom: '1rem' }}>
+                <div className="crop-image-area">
                     <ReactCrop
                         crop={crop}
-                        onChange={(_, percentCrop) => setCrop(percentCrop)}
+                        onChange={(c) => setCrop(c)}
                         onComplete={(c) => setCompletedCrop(c)}
                     >
-                        <img ref={imgRef} alt="Crop me" src={src} onLoad={onImageLoad} />
+                        <img
+                            ref={imgRef}
+                            src={src}
+                            onLoad={onImageLoad}
+                            alt="Crop me"
+                            style={{ maxWidth: '100%' }}
+                        />
                     </ReactCrop>
                 </div>
                 <div className="crop-actions">
-                    <button onClick={onCancel} style={{ backgroundColor: '#888', marginRight: '10px' }}>
-                        キャンセル
-                    </button>
-                    <button onClick={getCroppedImg} disabled={!completedCrop}>
-                        完了
-                    </button>
+                    <button onClick={onCancel} className="crop-cancel-btn">キャンセル</button>
+                    <button onClick={getCroppedImg}>トリミングを完了</button>
                 </div>
             </div>
         </div>
