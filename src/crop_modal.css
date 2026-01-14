@@ -1,0 +1,80 @@
+/* Crop Modal Styles */
+.crop-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    overscroll-behavior: contain;
+}
+
+.crop-modal-content {
+    background-color: #1a1a1a;
+    width: 100vw;
+    height: 100dvh;
+    /* Dynamic viewport height for mobile browsers */
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border-radius: 0;
+}
+
+.crop-modal-content h3 {
+    padding: 1rem;
+    margin: 0;
+    color: white;
+    background: #333;
+    font-size: 1rem;
+}
+
+.crop-image-area {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    background: #000;
+}
+
+.crop-actions {
+    display: flex;
+    gap: 1rem;
+    padding: 1.2rem;
+    background-color: #333;
+    justify-content: center;
+}
+
+.crop-actions button {
+    flex: 1;
+    max-width: 240px;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+}
+
+.crop-actions button:last-child {
+    background-color: var(--primary-color, #646cff);
+    color: white;
+}
+
+.crop-cancel-btn {
+    background-color: #555 !important;
+    color: #eee !important;
+}
+
+@media (min-width: 769px) {
+    .crop-modal-content {
+        width: 80vw;
+        height: 80vh;
+        border-radius: 12px;
+    }
+}
