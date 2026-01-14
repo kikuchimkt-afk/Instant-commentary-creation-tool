@@ -15,6 +15,7 @@ function App() {
   const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-1.5-flash");
   const [speechRate, setSpeechRate] = useState(0.75);
   const [customInstructions, setCustomInstructions] = useState(localStorage.getItem('ai_instructions') || "");
+  const [activeTab, setActiveTab] = useState('input'); // 'input' or 'result'
 
   const PRESETS = [
     { label: "標準", value: "" },
@@ -66,6 +67,7 @@ function App() {
     }
 
     setLoading(true);
+    setActiveTab('result'); // Switch to result tab on mobile
     try {
       // Extract base64 part
       const base64Images = images.map(img => img.split(',')[1]);
@@ -129,7 +131,7 @@ function App() {
           <input
             type="password"
             placeholder="Google Gemini API Key"
-            className="api-key-input"
+            className="api-key-input mobile-hidden"
             value={apiKey}
             onChange={handleApiKeyChange}
           />
@@ -137,14 +139,15 @@ function App() {
             href="https://aistudio.google.com/app/apikey"
             target="_blank"
             rel="noopener noreferrer"
+            className="mobile-hidden"
             style={{ color: '#fff', textDecoration: 'underline', alignSelf: 'center', fontSize: '0.9rem' }}
           >
-            取得はこちら
+            取得
           </a>
         </div>
       </header>
-      <main>
-        <div className="split-pane left-pane">
+      <main className={activeTab}>
+        <div className={`split-pane left-pane ${activeTab === 'input' ? 'mobile-visible' : 'mobile-hidden'}`}>
           <section>
             <h2>問題 (全 {images.length} ページ)</h2>
             <div className="images-list" style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '1rem', paddingBottom: '0.5rem' }}>
@@ -196,17 +199,35 @@ function App() {
             <button
               onClick={handlePrintPreview}
               disabled={images.length === 0 || !result}
+              className="mobile-hidden"
               style={{ flex: 1, padding: '1rem', fontSize: '1.2rem', backgroundColor: '#28a745' }}
             >
               印刷プレビュー 🖨️
             </button>
           </div>
         </div>
-        <div className="split-pane right-pane">
+        <div className={`split-pane right-pane ${activeTab === 'result' ? 'mobile-visible' : 'mobile-hidden'}`}>
           <h2>解説・解答</h2>
           <ResultDisplay result={result} loading={loading} speechRate={speechRate} />
         </div>
       </main>
+
+      <nav className="mobile-bottom-nav">
+        <button
+          className={activeTab === 'input' ? 'active' : ''}
+          onClick={() => setActiveTab('input')}
+        >
+          <span className="nav-icon">📷</span>
+          カメラ・入力
+        </button>
+        <button
+          className={activeTab === 'result' ? 'active' : ''}
+          onClick={() => setActiveTab('result')}
+        >
+          <span className="nav-icon">📖</span>
+          解説表示
+        </button>
+      </nav>
     </>
   );
 }
