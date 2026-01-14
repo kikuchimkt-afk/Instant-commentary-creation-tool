@@ -5,12 +5,27 @@ const CameraInput = ({ onAddPage }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [mediaStream, setMediaStream] = useState(null);
 
     // Cropping State
     const [tempImage, setTempImage] = useState(null);
     const [showCropModal, setShowCropModal] = useState(false);
 
+    // Initialize camera stream when isCameraOpen becomes true
+    useEffect(() => {
+        if (isCameraOpen && mediaStream && videoRef.current) {
+            videoRef.current.srcObject = mediaStream;
+            videoRef.current.play().catch(e => console.error("Video play failed:", e));
+        }
+    }, [isCameraOpen, mediaStream]);
+
     const startCamera = async () => {
+        // Validation: Check if browser supports mediaDevices (often fails on HTTP)
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("カメラ機能がサポートされていません。HTTPSまたはローカルホストで接続してください。");
+            return;
+        }
+
         try {
             const constraints = {
                 video: {
@@ -18,12 +33,8 @@ const CameraInput = ({ onAddPage }) => {
                 }
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                // Explicitly call play() to ensure it starts on some mobile browsers
-                await videoRef.current.play();
-                setIsCameraOpen(true);
-            }
+            setMediaStream(stream);
+            setIsCameraOpen(true);
         } catch (err) {
             console.error("Error accessing camera:", err);
             alert("カメラの起動に失敗しました。詳細: " + err.message);
@@ -31,13 +42,12 @@ const CameraInput = ({ onAddPage }) => {
     };
 
     const stopCamera = () => {
-        if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject;
-            const tracks = stream.getTracks();
+        if (mediaStream) {
+            const tracks = mediaStream.getTracks();
             tracks.forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-            setIsCameraOpen(false);
+            setMediaStream(null);
         }
+        setIsCameraOpen(false);
     };
 
     const captureImage = () => {
@@ -107,7 +117,7 @@ const CameraInput = ({ onAddPage }) => {
                 )}
 
                 {isCameraOpen && (
-                    <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%' }} />
+                    <video ref={videoRef} playsInline style={{ width: '100%', height: '100%' }} />
                 )}
 
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
