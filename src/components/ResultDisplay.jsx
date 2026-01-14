@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 
 const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
     const [progress, setProgress] = React.useState(0);
+    const audioQueueRef = React.useRef({ sentences: [], index: 0, isActive: false });
 
     React.useEffect(() => {
         let interval;
@@ -25,21 +26,69 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
         return () => clearInterval(interval);
     }, [loading]);
 
+    // Ensure speech is stopped when component unmounts
+    React.useEffect(() => {
+        return () => {
+            window.speechSynthesis.cancel();
+            audioQueueRef.current.isActive = false;
+        };
+    }, []);
+
+    const getBestVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        // Priority: Google US English > Any Google English > Any en-US > Any English
+        const googleUS = voices.find(v => v.name.includes("Google") && (v.lang === "en-US" || v.lang === "en_US"));
+        if (googleUS) return googleUS;
+
+        const googleAnyEn = voices.find(v => v.name.includes("Google") && v.lang.startsWith("en"));
+        if (googleAnyEn) return googleAnyEn;
+
+        const anyUS = voices.find(v => v.lang === "en-US" || v.lang === "en_US");
+        if (anyUS) return anyUS;
+
+        return voices.find(v => v.lang.startsWith("en"));
+    };
+
+    const processNextInQueue = () => {
+        const queue = audioQueueRef.current;
+        if (!queue.isActive || queue.index >= queue.sentences.length) {
+            queue.isActive = false;
+            return;
+        }
+
+        const sentence = queue.sentences[queue.index];
+        const utterance = new SpeechSynthesisUtterance(sentence);
+        const voice = getBestVoice();
+        if (voice) utterance.voice = voice;
+        utterance.rate = speechRate;
+        utterance.lang = 'en-US';
+
+        utterance.onend = () => {
+            queue.index++;
+            processNextInQueue();
+        };
+
+        utterance.onerror = (e) => {
+            console.error("Speech error", e);
+            queue.index++;
+            processNextInQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+
     const splitIntoSentences = (text) => {
         const abbreviations = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "U.S.", "e.g.", "i.e.", "etc.", "vs.", "St."];
         let tempText = text;
 
-        // Temporarily replace dots in common abbreviations to prevent incorrect splitting
         abbreviations.forEach((abbr, i) => {
             const placeholder = `__ABBR${i}__`;
             const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.')}`, 'g');
             tempText = tempText.replace(regex, placeholder);
         });
 
-        // Split by punctuation (!, ?, .) followed by whitespace
         const sentences = tempText.split(/(?<=[.!?])\s+/);
 
-        // Restore abbreviations and return cleaned sentences
         return sentences.map(s => {
             let restored = s;
             abbreviations.forEach((abbr, i) => {
@@ -53,28 +102,28 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
     const speakText = (text) => {
         if (!text) return;
 
-        // Stop any current speech
+        // Reset and stop existing speech
         window.speechSynthesis.cancel();
 
-        // Remove Japanese characters (Hiragana, Katakana, Kanji, punctuation)
         const englishOnlyText = text.replace(/[ぁ-んァ-ヶ亜-熙。、、「」]/g, ' ').trim();
-
-        // Split into smart sentences
         const sentences = splitIntoSentences(englishOnlyText);
 
         if (sentences.length === 0) return;
 
-        // Queue each sentence separately for natural pauses
-        sentences.forEach((sentence) => {
-            const utterance = new SpeechSynthesisUtterance(sentence);
-            utterance.rate = speechRate;
-            utterance.lang = 'en-US';
-            window.speechSynthesis.speak(utterance);
-        });
+        // Initialize new queue
+        audioQueueRef.current = {
+            sentences: sentences,
+            index: 0,
+            isActive: true
+        };
+
+        // Some mobile browsers need a small delay after cancel() before speaking again
+        setTimeout(() => {
+            processNextInQueue();
+        }, 50);
     };
 
     const handleContainerClick = (e) => {
-        // Target paragraphs, list items, and headers
         const target = e.target.closest('p, li, h1, h2, h3, code');
         if (target) {
             const text = target.innerText || target.textContent;
