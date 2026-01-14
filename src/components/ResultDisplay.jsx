@@ -36,13 +36,26 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
 
     const getBestVoice = () => {
         const voices = window.speechSynthesis.getVoices();
-        // Priority: Google US English > Any Google English > Any en-US > Any English
-        const googleUS = voices.find(v => v.name.includes("Google") && (v.lang === "en-US" || v.lang === "en_US"));
-        if (googleUS) return googleUS;
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-        const googleAnyEn = voices.find(v => v.name.includes("Google") && v.lang.startsWith("en"));
-        if (googleAnyEn) return googleAnyEn;
+        if (isMobile) {
+            // Mobile: Prioritize Google voices
+            const googleUS = voices.find(v => v.name.includes("Google") && (v.lang === "en-US" || v.lang === "en_US"));
+            if (googleUS) return googleUS;
 
+            const googleAnyEn = voices.find(v => v.name.includes("Google") && v.lang.startsWith("en"));
+            if (googleAnyEn) return googleAnyEn;
+        } else {
+            // PC: Prioritize high-quality native voices (like Microsoft Natural)
+            // Microsoft "Natural" voices often provide better quality on Windows.
+            const naturalUS = voices.find(v => v.name.includes("Natural") && (v.lang === "en-US" || v.lang === "en_US"));
+            if (naturalUS) return naturalUS;
+
+            const microsoftUS = voices.find(v => v.name.includes("Microsoft") && (v.lang === "en-US" || v.lang === "en_US"));
+            if (microsoftUS) return microsoftUS;
+        }
+
+        // Fallback to any en-US
         const anyUS = voices.find(v => v.lang === "en-US" || v.lang === "en_US");
         if (anyUS) return anyUS;
 
@@ -59,17 +72,24 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
         const sentence = queue.sentences[queue.index];
         const utterance = new SpeechSynthesisUtterance(sentence);
         const voice = getBestVoice();
-        if (voice) utterance.voice = voice;
+
+        if (voice) {
+            utterance.voice = voice;
+        }
+
         utterance.rate = speechRate;
         utterance.lang = 'en-US';
 
         utterance.onend = () => {
+            if (!queue.isActive) return;
             queue.index++;
-            processNextInQueue();
+            // Small delay for natural feel and stable queuing on mobile
+            setTimeout(processNextInQueue, 100);
         };
 
         utterance.onerror = (e) => {
             console.error("Speech error", e);
+            if (!queue.isActive) return;
             queue.index++;
             processNextInQueue();
         };
@@ -78,7 +98,7 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
     };
 
     const splitIntoSentences = (text) => {
-        const abbreviations = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "U.S.", "e.g.", "i.e.", "etc.", "vs.", "St."];
+        const abbreviations = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "U.S.", "USA.", "e.g.", "i.e.", "etc.", "vs.", "St.", "Jan.", "Feb.", "Mar.", "Apr.", "Jun.", "Jul.", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
         let tempText = text;
 
         abbreviations.forEach((abbr, i) => {
@@ -87,6 +107,7 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
             tempText = tempText.replace(regex, placeholder);
         });
 
+        // Split by punctuation followed by space
         const sentences = tempText.split(/(?<=[.!?])\s+/);
 
         return sentences.map(s => {
@@ -104,8 +125,9 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
 
         // Reset and stop existing speech
         window.speechSynthesis.cancel();
+        audioQueueRef.current.isActive = false;
 
-        const englishOnlyText = text.replace(/[ぁ-んァ-ヶ亜-熙。、、「」]/g, ' ').trim();
+        const englishOnlyText = text.replace(/[ぁ-んァ-ヶ亜-熙。、、「」]/g, ' ').replace(/\s+/g, ' ').trim();
         const sentences = splitIntoSentences(englishOnlyText);
 
         if (sentences.length === 0) return;
@@ -117,10 +139,14 @@ const ResultDisplay = ({ result, loading, speechRate = 0.75 }) => {
             isActive: true
         };
 
-        // Some mobile browsers need a small delay after cancel() before speaking again
+        // Resume engine if stuck
+        if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+        }
+
         setTimeout(() => {
             processNextInQueue();
-        }, 50);
+        }, 100);
     };
 
     const handleContainerClick = (e) => {
