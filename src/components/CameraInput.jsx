@@ -12,14 +12,21 @@ const CameraInput = ({ onAddPage }) => {
 
     const startCamera = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const constraints = {
+                video: {
+                    facingMode: { ideal: 'environment' }
+                }
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                // Explicitly call play() to ensure it starts on some mobile browsers
+                await videoRef.current.play();
                 setIsCameraOpen(true);
             }
         } catch (err) {
             console.error("Error accessing camera:", err);
-            // alert("カメラへのアクセスが拒否されました。"); 
+            alert("カメラの起動に失敗しました。詳細: " + err.message);
         }
     };
 
