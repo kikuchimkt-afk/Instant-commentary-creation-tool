@@ -26,6 +26,9 @@ const PrintLayout = () => {
     const [showOCR, setShowOCR] = useState(true);
     const [showExplanation, setShowExplanation] = useState(true);
     const [documentTitle, setDocumentTitle] = useState("");
+    const [scale, setScale] = useState(100);
+    const [margin, setMargin] = useState(10);
+    const [showBackground, setShowBackground] = useState(false);
 
     // EFFECT: Override global app styles
     useEffect(() => {
@@ -83,113 +86,155 @@ const PrintLayout = () => {
     const shouldRenderProblemSection = showProblem || (showOCR && !!ocrText);
 
     return (
-        <div className="print-layout">
-            {/* Header Control Panel (Hidden in Print) */}
-            <div className="no-print" style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                background: '#f0f0f0',
-                padding: '0.5rem 1rem',
-                borderBottom: '1px solid #ccc',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                zIndex: 1000,
+        <div className="print-layout" style={{ backgroundColor: showBackground ? '#555' : '#fff' }}>
+            {/* Scale Container */}
+            <div style={{
+                transform: `scale(${scale / 100})`,
+                transformOrigin: 'top left',
+                width: `${10000 / scale}%`,
+                padding: `${margin}mm ${margin + 2}mm`,
                 boxSizing: 'border-box'
             }}>
-                <div style={{ flex: 1 }}>
-                    <input
-                        type="text"
-                        value={documentTitle}
-                        onChange={(e) => setDocumentTitle(e.target.value)}
-                        placeholder="タイトルを入力..." // "Enter title..."
-                        style={{
-                            padding: '0.5rem',
-                            borderRadius: '4px',
-                            border: '1px solid #ccc',
-                            width: '300px',
-                            fontSize: '1rem'
-                        }}
-                    />
-                </div>
-
-                <div style={{ display: 'flex', gap: '2rem', flex: 2, justifyContent: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showProblem} onChange={e => setShowProblem(e.target.checked)} />
-                        問題画像
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showOCR} onChange={e => setShowOCR(e.target.checked)} />
-                        問題文 (OCR)
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showExplanation} onChange={e => setShowExplanation(e.target.checked)} />
-                        解説・解答
-                    </label>
-                </div>
-
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={() => window.print()} style={{ padding: '6px 16px', cursor: 'pointer', fontWeight: 'bold' }}>
-                        印刷する 🖨️
-                    </button>
-                </div>
-            </div>
-
-            {/* Document Title Display (Top Left) */}
-            <div className="print-title-container">
-                {documentTitle && (
-                    <h1 style={{
-                        fontSize: '1.8rem',
-                        margin: 0,
-                        paddingBottom: '0.5rem',
-                        lineHeight: 1.2
-                    }}>
-                        {documentTitle}
-                    </h1>
-                )}
-            </div>
-
-            <div className="print-content">
-                {/* Left Column / Problem Section */}
-                {shouldRenderProblemSection && (
-                    <div className="problem-section">
-                        <h2>問題</h2>
-                        {showProblem && (
-                            <>
-                                {data.images.length > 0 ? (
-                                    data.images.map((img, index) => (
-                                        <div key={index} style={{ marginBottom: '1rem' }}>
-                                            <img src={img} alt={`Problem Page ${index + 1}`} className="print-image" />
-                                            <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#666' }}>- {index + 1} -</div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p style={{ color: '#999' }}>画像がありません</p>
-                                )}
-                            </>
-                        )}
-                        {showOCR && ocrText && (
-                            <div style={{ marginTop: '2rem' }}>
-                                <div style={{ borderTop: '1px dashed #ccc', margin: '1rem 0' }}></div>
-                                <h3 style={{ marginTop: '1rem', marginBottom: '0.5rem', fontSize: '1.2rem', color: '#333' }}>問題文 (OCR)</h3>
-                                <ResultDisplay result={ocrText} loading={false} />
-                            </div>
-                        )}
+                {/* Header Control Panel (Hidden in Print) */}
+                <div className="no-print" style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    background: '#f0f0f0',
+                    padding: '0.5rem 1rem',
+                    borderBottom: '1px solid #ccc',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    zIndex: 1000,
+                    boxSizing: 'border-box',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            value={documentTitle}
+                            onChange={(e) => setDocumentTitle(e.target.value)}
+                            placeholder="タイトルを入力..."
+                            style={{
+                                padding: '0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid #ccc',
+                                width: '200px',
+                                fontSize: '1rem'
+                            }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'white', padding: '5px 10px', borderRadius: '5px', border: '1px solid #ddd' }}>
+                            <button onClick={() => setScale(Math.max(50, scale - 5))} style={{ width: '28px', height: '28px', border: '1px solid #ccc', background: '#f3f4f6', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>−</button>
+                            <span>サイズ: {scale}%</span>
+                            <input type="range" min="50" max="150" value={scale} onChange={e => setScale(Number(e.target.value))} style={{ width: '80px' }} />
+                            <button onClick={() => setScale(Math.min(150, scale + 5))} style={{ width: '28px', height: '28px', border: '1px solid #ccc', background: '#f3f4f6', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>+</button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'white', padding: '5px 10px', borderRadius: '5px', border: '1px solid #ddd' }}>
+                            <label>余白:</label>
+                            <select value={margin} onChange={e => setMargin(Number(e.target.value))} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+                                <option value={0}>なし</option>
+                                <option value={5}>狭い</option>
+                                <option value={10}>普通</option>
+                                <option value={15}>広い</option>
+                            </select>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'white', padding: '5px 10px', borderRadius: '5px', border: '1px solid #ddd', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={showBackground} onChange={e => setShowBackground(e.target.checked)} />
+                            背景を表示
+                        </label>
                     </div>
-                )}
 
-                {/* Right Column / Explanation Section */}
-                {showExplanation && (
-                    <div className="explanation-section">
-                        <h2 style={{ marginTop: '0' }}>解説・解答</h2>
-                        <ResultDisplay result={explanationText} loading={false} />
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={showProblem} onChange={e => setShowProblem(e.target.checked)} />
+                            問題画像
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={showOCR} onChange={e => setShowOCR(e.target.checked)} />
+                            問題文 (OCR)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={showExplanation} onChange={e => setShowExplanation(e.target.checked)} />
+                            解説・解答
+                        </label>
                     </div>
-                )}
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => window.print()} style={{ padding: '6px 16px', cursor: 'pointer', fontWeight: 'bold', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px' }}>
+                            🖨️ 印刷
+                        </button>
+                        <button onClick={() => window.close()} style={{ padding: '6px 16px', cursor: 'pointer', fontWeight: 'bold', background: '#6b7280', color: 'white', border: 'none', borderRadius: '4px' }}>
+                            ✕ 閉じる
+                        </button>
+                    </div>
+                </div>
+
+                {/* Document Title Display (Top Left) */}
+                <div className="print-title-container">
+                    {documentTitle && (
+                        <h1 style={{
+                            fontSize: '1.8rem',
+                            margin: 0,
+                            paddingBottom: '0.5rem',
+                            lineHeight: 1.2
+                        }}>
+                            {documentTitle}
+                        </h1>
+                    )}
+                </div>
+
+                <div className="print-content">
+                    {/* Left Column / Problem Section */}
+                    {shouldRenderProblemSection && (
+                        <div className="problem-section">
+                            <h2>問題</h2>
+                            {showProblem && (
+                                <>
+                                    {data.images.length > 0 ? (
+                                        data.images.map((img, index) => (
+                                            <div key={index} style={{ marginBottom: '1rem' }}>
+                                                <img src={img} alt={`Problem Page ${index + 1}`} className="print-image" />
+                                                <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#666' }}>- {index + 1} -</div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p style={{ color: '#999' }}>画像がありません</p>
+                                    )}
+                                </>
+                            )}
+                            {showOCR && ocrText && (
+                                <div style={{ marginTop: '2rem' }}>
+                                    <div style={{ borderTop: '1px dashed #ccc', margin: '1rem 0' }}></div>
+                                    <h3 style={{ marginTop: '1rem', marginBottom: '0.5rem', fontSize: '1.2rem', color: '#333' }}>問題文 (OCR)</h3>
+                                    <ResultDisplay result={ocrText} loading={false} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Right Column / Explanation Section */}
+                    {showExplanation && (
+                        <div className="explanation-section">
+                            <h2 style={{ marginTop: '0' }}>解説・解答</h2>
+                            <ResultDisplay result={explanationText} loading={false} />
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="print-footer">
+            {/* Copyright Footer - Outside scale container, fixed to bottom */}
+            <div className="print-footer" style={{
+                position: 'fixed',
+                bottom: '10mm',
+                left: 0,
+                right: 0,
+                textAlign: 'center',
+                fontSize: '10px',
+                color: '#555'
+            }}>
                 ECCベストワン藍住・北島中央
             </div>
         </div>
@@ -197,3 +242,4 @@ const PrintLayout = () => {
 };
 
 export default PrintLayout;
+

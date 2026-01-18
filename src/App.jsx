@@ -12,7 +12,7 @@ function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || "");
-  const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-1.5-flash");
+  const [model, setModel] = useState(localStorage.getItem('gemini_model') || "gemini-3-flash-preview");
   const [speechRate, setSpeechRate] = useState(0.75);
   const [customInstructions, setCustomInstructions] = useState(localStorage.getItem('ai_instructions') || "");
   const [activeTab, setActiveTab] = useState('input'); // 'input' or 'result'

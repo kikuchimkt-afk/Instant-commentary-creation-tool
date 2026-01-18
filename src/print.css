@@ -67,7 +67,7 @@
 }
 
 .problem-section {
-    break-after: column;
+    /* break-after: column; Removed to allow natural flow into second column */
 }
 
 .explanation-section {

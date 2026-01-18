@@ -7,7 +7,7 @@ const GENERATION_CONFIG = {
   maxOutputTokens: 8192,
 };
 
-export const generateExplanation = async (apiKey, imageBase64Data, modelName = "gemini-1.5-flash", customInstructions = "") => {
+export const generateExplanation = async (apiKey, imageBase64Data, modelName = "gemini-3-flash-preview", customInstructions = "") => {
   if (!apiKey) {
     throw new Error("API Key is missing");
   }
